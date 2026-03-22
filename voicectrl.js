@@ -47,8 +47,8 @@ var voices = [
 	{pitch:40, decay_ms:32, exciter_type:0, body_type:3,
 	 stress:0.7, bloom:0.4, scar:0.7, weight:0.8,
 	 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5},
-	{pitch:72, decay_ms:45, exciter_type:1, body_type:0,
-	 stress:0.6, bloom:0.85, scar:0.4, weight:0.2,
+	{pitch:72, decay_ms:60, exciter_type:1, body_type:2,
+	 stress:0.6, bloom:0.95, scar:0.4, weight:0.2,
 	 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4}
 ];
 

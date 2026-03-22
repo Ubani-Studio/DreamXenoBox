@@ -1033,7 +1033,7 @@
 										700,
 										450
 									],
-									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000005 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 1.25;\ndecay_norm = clamp(eff_decay / 8000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / body_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.6 + ya * 0.4);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nout_env = max(main_env, halo_env * mist);\nout1 = fractured * out_env;"
+									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000001 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 2.5;\ndecay_norm = clamp(eff_decay / 16000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / base_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / base_freq, 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.4 + ya * 0.6);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nbl_env = halo_env * mist;\nout_env = max(main_env, bl_env);\nout1 = fractured * out_env;"
 								}
 							},
 							{
@@ -1090,13 +1090,88 @@
 					"patching_rect": [
 						75,
 						442,
-						55,
+						40,
 						22
 					],
 					"outlettype": [
 						"signal"
 					],
-					"text": "*~ 0.5"
+					"text": "*~ 1."
+				}
+			},
+			{
+				"box": {
+					"id": "vlf-0",
+					"maxclass": "flonum",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						120,
+						442,
+						45,
+						22
+					],
+					"outlettype": [
+						"float",
+						"bang"
+					],
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"numdecimalplaces": 2
+				}
+			},
+			{
+				"box": {
+					"id": "vlr-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						170,
+						442,
+						85,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "receive v0_level"
+				}
+			},
+			{
+				"box": {
+					"id": "vls-0",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						170,
+						465,
+						50,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "set $1"
+				}
+			},
+			{
+				"box": {
+					"id": "vld-0",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						120,
+						465,
+						40,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "0.5"
 				}
 			},
 			{
@@ -1107,11 +1182,29 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						472,
+						490,
 						80,
 						22
 					],
 					"text": "send~ v0_out"
+				}
+			},
+			{
+				"box": {
+					"id": "vlk-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						120,
+						490,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend voice_level 0"
 				}
 			},
 			{
@@ -1255,7 +1348,7 @@
 										700,
 										450
 									],
-									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000005 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 1.25;\ndecay_norm = clamp(eff_decay / 8000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / body_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.6 + ya * 0.4);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nout_env = max(main_env, halo_env * mist);\nout1 = fractured * out_env;"
+									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000001 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 2.5;\ndecay_norm = clamp(eff_decay / 16000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / base_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / base_freq, 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.4 + ya * 0.6);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nbl_env = halo_env * mist;\nout_env = max(main_env, bl_env);\nout1 = fractured * out_env;"
 								}
 							},
 							{
@@ -1312,13 +1405,88 @@
 					"patching_rect": [
 						225,
 						442,
-						55,
+						40,
 						22
 					],
 					"outlettype": [
 						"signal"
 					],
-					"text": "*~ 0.3"
+					"text": "*~ 1."
+				}
+			},
+			{
+				"box": {
+					"id": "vlf-1",
+					"maxclass": "flonum",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						270,
+						442,
+						45,
+						22
+					],
+					"outlettype": [
+						"float",
+						"bang"
+					],
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"numdecimalplaces": 2
+				}
+			},
+			{
+				"box": {
+					"id": "vlr-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						320,
+						442,
+						85,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "receive v1_level"
+				}
+			},
+			{
+				"box": {
+					"id": "vls-1",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						320,
+						465,
+						50,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "set $1"
+				}
+			},
+			{
+				"box": {
+					"id": "vld-1",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						270,
+						465,
+						40,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "0.3"
 				}
 			},
 			{
@@ -1329,11 +1497,29 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						225,
-						472,
+						490,
 						80,
 						22
 					],
 					"text": "send~ v1_out"
+				}
+			},
+			{
+				"box": {
+					"id": "vlk-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						270,
+						490,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend voice_level 1"
 				}
 			},
 			{
@@ -1477,7 +1663,7 @@
 										700,
 										450
 									],
-									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000005 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 1.25;\ndecay_norm = clamp(eff_decay / 8000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / body_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.6 + ya * 0.4);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nout_env = max(main_env, halo_env * mist);\nout1 = fractured * out_env;"
+									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000001 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 2.5;\ndecay_norm = clamp(eff_decay / 16000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / base_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / base_freq, 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.4 + ya * 0.6);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nbl_env = halo_env * mist;\nout_env = max(main_env, bl_env);\nout1 = fractured * out_env;"
 								}
 							},
 							{
@@ -1534,13 +1720,88 @@
 					"patching_rect": [
 						375,
 						442,
-						55,
+						40,
 						22
 					],
 					"outlettype": [
 						"signal"
 					],
-					"text": "*~ 0.25"
+					"text": "*~ 1."
+				}
+			},
+			{
+				"box": {
+					"id": "vlf-2",
+					"maxclass": "flonum",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						420,
+						442,
+						45,
+						22
+					],
+					"outlettype": [
+						"float",
+						"bang"
+					],
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"numdecimalplaces": 2
+				}
+			},
+			{
+				"box": {
+					"id": "vlr-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						470,
+						442,
+						85,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "receive v2_level"
+				}
+			},
+			{
+				"box": {
+					"id": "vls-2",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						470,
+						465,
+						50,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "set $1"
+				}
+			},
+			{
+				"box": {
+					"id": "vld-2",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						420,
+						465,
+						40,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "0.25"
 				}
 			},
 			{
@@ -1551,11 +1812,29 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						375,
-						472,
+						490,
 						80,
 						22
 					],
 					"text": "send~ v2_out"
+				}
+			},
+			{
+				"box": {
+					"id": "vlk-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						420,
+						490,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend voice_level 2"
 				}
 			},
 			{
@@ -1699,7 +1978,7 @@
 										700,
 										450
 									],
-									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000005 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 1.25;\ndecay_norm = clamp(eff_decay / 8000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / body_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.6 + ya * 0.4);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nout_env = max(main_env, halo_env * mist);\nout1 = fractured * out_env;"
+									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000001 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 2.5;\ndecay_norm = clamp(eff_decay / 16000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / base_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / base_freq, 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.4 + ya * 0.6);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nbl_env = halo_env * mist;\nout_env = max(main_env, bl_env);\nout1 = fractured * out_env;"
 								}
 							},
 							{
@@ -1756,13 +2035,88 @@
 					"patching_rect": [
 						525,
 						442,
-						55,
+						40,
 						22
 					],
 					"outlettype": [
 						"signal"
 					],
-					"text": "*~ 0.3"
+					"text": "*~ 1."
+				}
+			},
+			{
+				"box": {
+					"id": "vlf-3",
+					"maxclass": "flonum",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						570,
+						442,
+						45,
+						22
+					],
+					"outlettype": [
+						"float",
+						"bang"
+					],
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"numdecimalplaces": 2
+				}
+			},
+			{
+				"box": {
+					"id": "vlr-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						620,
+						442,
+						85,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "receive v3_level"
+				}
+			},
+			{
+				"box": {
+					"id": "vls-3",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						620,
+						465,
+						50,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "set $1"
+				}
+			},
+			{
+				"box": {
+					"id": "vld-3",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						570,
+						465,
+						40,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "0.3"
 				}
 			},
 			{
@@ -1773,11 +2127,29 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						525,
-						472,
+						490,
 						80,
 						22
 					],
 					"text": "send~ v3_out"
+				}
+			},
+			{
+				"box": {
+					"id": "vlk-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						570,
+						490,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend voice_level 3"
 				}
 			},
 			{
@@ -1921,7 +2293,7 @@
 										700,
 										450
 									],
-									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000005 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 1.25;\ndecay_norm = clamp(eff_decay / 8000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / body_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.6 + ya * 0.4);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nout_env = max(main_env, halo_env * mist);\nout1 = fractured * out_env;"
+									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000001 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 2.5;\ndecay_norm = clamp(eff_decay / 16000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / base_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / base_freq, 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.4 + ya * 0.6);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nbl_env = halo_env * mist;\nout_env = max(main_env, bl_env);\nout1 = fractured * out_env;"
 								}
 							},
 							{
@@ -1978,13 +2350,88 @@
 					"patching_rect": [
 						675,
 						442,
-						55,
+						40,
 						22
 					],
 					"outlettype": [
 						"signal"
 					],
-					"text": "*~ 0.35"
+					"text": "*~ 1."
+				}
+			},
+			{
+				"box": {
+					"id": "vlf-4",
+					"maxclass": "flonum",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						720,
+						442,
+						45,
+						22
+					],
+					"outlettype": [
+						"float",
+						"bang"
+					],
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"numdecimalplaces": 2
+				}
+			},
+			{
+				"box": {
+					"id": "vlr-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						770,
+						442,
+						85,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "receive v4_level"
+				}
+			},
+			{
+				"box": {
+					"id": "vls-4",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						770,
+						465,
+						50,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "set $1"
+				}
+			},
+			{
+				"box": {
+					"id": "vld-4",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						720,
+						465,
+						40,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "0.35"
 				}
 			},
 			{
@@ -1995,11 +2442,29 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						675,
-						472,
+						490,
 						80,
 						22
 					],
 					"text": "send~ v4_out"
+				}
+			},
+			{
+				"box": {
+					"id": "vlk-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						720,
+						490,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend voice_level 4"
 				}
 			},
 			{
@@ -2143,7 +2608,7 @@
 										700,
 										450
 									],
-									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000005 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 1.25;\ndecay_norm = clamp(eff_decay / 8000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / body_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.6 + ya * 0.4);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nout_env = max(main_env, halo_env * mist);\nout1 = fractured * out_env;"
+									"code": "Param pitch(60);\nParam decay_ms(200);\nParam exciter_type(0);\nParam body_type(0);\nParam stress(0.3);\nParam bloom(0.3);\nParam scar(0);\nParam weight(0.5);\nParam mist(0.2);\nParam heat_macro(0.3);\nParam drift_param(0);\nParam density_param(0.5);\n\nHistory prev_trig(0);\nHistory pressure(0);\nHistory heat_state(0);\nHistory fatigue(0);\nHistory exc_car_phase(0);\nHistory exc_mod_phase(0);\nHistory exc_env(0);\nHistory noise_filt(0);\nHistory ry1_a(0);\nHistory ry2_a(0);\nHistory ry1_b(0);\nHistory ry2_b(0);\nHistory ry1_c(0);\nHistory ry2_c(0);\nHistory ry1_d(0);\nHistory ry2_d(0);\nHistory comb_lp(0);\nHistory halo_env(0);\nHistory main_env(0);\nHistory pitch_env(0);\nHistory fb_state(0);\nHistory fb_hp(0);\nHistory cav_lp(0);\nDelay comb_d(8820);\nDelay cav_d(8820);\n\ntrig_on = (in1 > 0.5) * (prev_trig <= 0.5);\nvel = in1;\nprev_trig = in1;\n\nif (trig_on) {\n    pressure = min(pressure + vel * (0.3 + stress * 0.7) * (1 - pressure), 1);\n    fatigue = min(fatigue + 0.02 * (1 - fatigue), 1);\n    exc_env = 1;\n    halo_env = vel * mist;\n    main_env = vel;\n    pitch_env = vel;\n}\n\np_decay = 0.00002 + (1 - stress) * 0.00008;\npressure = pressure * (1 - p_decay);\nheat_state = heat_state + (pressure - heat_state) * 0.0002;\nheat_state = heat_state * (1 - 0.00005);\nfatigue = fatigue * (1 - 0.000002);\nstiffness = fatigue * 0.6 + pressure * 0.4;\n\neff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);\neff_scar = clamp(scar + pressure * stress, 0, 1);\n\np_env_rate = 0.002 + weight * 0.008;\npitch_env = pitch_env * (1 - p_env_rate);\np_sweep = pitch_env * weight * 24;\np_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;\nbase_freq = mtof(clamp(p_mod, 10, 130));\nw_scale = 1 - weight * 0.8;\nbody_freq = base_freq * w_scale;\n\ne_decay = 0.001 + density_param * 0.003;\nexc_env = exc_env * (1 - e_decay);\n\nexciter_out = 0;\nif (exciter_type < 0.5) {\n    fm_r = 1.41 + eff_heat * 2;\n    mf = base_freq * fm_r;\n    fm_idx = (8 + eff_heat * 12) * exc_env;\n    exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);\n    mod_sig = sin(exc_mod_phase * twopi) * fm_idx;\n    exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);\n    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;\n} else {\n    n = noise();\n    cutoff = base_freq * (2 + eff_heat * 8);\n    coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);\n    noise_filt = noise_filt + (n - noise_filt) * coeff;\n    exciter_out = noise_filt * 4 * exc_env;\n}\n\nfb_gain = mist * (0.5 + stress * 0.5);\nfb_gain = clamp(fb_gain, 0, 0.95);\nhp_cut = 200 + (1 - weight) * 800;\nhp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);\nfb_lp = fb_hp + (fb_state - fb_hp) * hp_c;\nfb_hp = fb_lp;\nfb_hpf = fb_state - fb_lp;\nfb_ltd = tanh(fb_hpf * 2) * 0.5;\nbl_rate = 0.000001 + (1 - bloom) * 0.0003;\nhalo_env = halo_env * (1 - bl_rate);\nfb_sig = fb_ltd * fb_gain * halo_env;\nbody_input = exciter_out + fb_sig;\n\neff_decay = decay_ms * decay_ms * 2.5;\ndecay_norm = clamp(eff_decay / 16000, 0, 1);\neff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);\n\nbody_out = 0;\nif (body_type < 0.5) {\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;\n    r3 = eff_Q * 0.98;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;\n    r4 = eff_Q * 0.97;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;\n} else if (body_type < 1.5) {\n    d_samps = clamp(samplerate / base_freq, 2, 8000);\n    fb = eff_Q * 0.9;\n    delayed = comb_d.read(d_samps);\n    d_coeff = 0.3 + fatigue * 0.4;\n    comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;\n    comb_d.write(body_input + comb_lp * fb);\n    body_out = delayed;\n} else if (body_type < 2.5) {\n    cav_len = clamp(samplerate / base_freq, 2, 8000);\n    cav_fb = eff_Q * (0.85 + pressure * 0.1);\n    cav_fb = clamp(cav_fb, 0, 0.995);\n    cav_del = cav_d.read(cav_len);\n    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;\n    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;\n    cav_d.write(body_input + cav_lp * cav_fb);\n    w1 = twopi * body_freq * 1.0 / samplerate;\n    r1 = eff_Q * 0.95;\n    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    body_out = (cav_del * 0.4 + ya * 0.6);\n} else {\n    mem_r1 = 1.0;\n    mem_r2 = 1.594;\n    mem_r3 = 2.136;\n    mem_r4 = 2.296;\n    w1 = twopi * body_freq * mem_r1 / samplerate;\n    r1 = eff_Q * 0.998;\n    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;\n    ry2_a = ry1_a; ry1_a = ya;\n    w2 = twopi * body_freq * mem_r2 / samplerate;\n    r2 = eff_Q * 0.99;\n    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;\n    ry2_b = ry1_b; ry1_b = yb;\n    w3 = twopi * body_freq * mem_r3 / samplerate;\n    r3 = eff_Q * 0.985;\n    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;\n    ry2_c = ry1_c; ry1_c = yc;\n    w4 = twopi * body_freq * mem_r4 / samplerate;\n    r4 = eff_Q * 0.98;\n    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;\n    ry2_d = ry1_d; ry1_d = yd;\n    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);\n}\n\nfold_d = 1 + eff_scar * 4;\nfractured = body_out;\nif (eff_scar > 0.01) {\n    biased = body_out + pressure * 0.3;\n    folded = asin(sin(biased * fold_d * 1.5707963)) * 0.6366197;\n    fractured = body_out * (1 - eff_scar) + folded * eff_scar;\n}\n\nfb_source = body_out * (1 - stress) + fractured * stress;\nfb_state = fb_source;\n\nenv_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);\nmain_env = main_env * (1 - env_rate);\n\nbl_env = halo_env * mist;\nout_env = max(main_env, bl_env);\nout1 = fractured * out_env;"
 								}
 							},
 							{
@@ -2200,13 +2665,88 @@
 					"patching_rect": [
 						825,
 						442,
-						55,
+						40,
 						22
 					],
 					"outlettype": [
 						"signal"
 					],
-					"text": "*~ 0.2"
+					"text": "*~ 1."
+				}
+			},
+			{
+				"box": {
+					"id": "vlf-5",
+					"maxclass": "flonum",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						870,
+						442,
+						45,
+						22
+					],
+					"outlettype": [
+						"float",
+						"bang"
+					],
+					"minimum": 0.0,
+					"maximum": 1.0,
+					"numdecimalplaces": 2
+				}
+			},
+			{
+				"box": {
+					"id": "vlr-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						920,
+						442,
+						85,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "receive v5_level"
+				}
+			},
+			{
+				"box": {
+					"id": "vls-5",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						920,
+						465,
+						50,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "set $1"
+				}
+			},
+			{
+				"box": {
+					"id": "vld-5",
+					"maxclass": "message",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						870,
+						465,
+						40,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "0.2"
 				}
 			},
 			{
@@ -2217,11 +2757,29 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						825,
-						472,
+						490,
 						80,
 						22
 					],
 					"text": "send~ v5_out"
+				}
+			},
+			{
+				"box": {
+					"id": "vlk-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						870,
+						490,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend voice_level 5"
 				}
 			},
 			{
@@ -3714,6 +4272,227 @@
 			},
 			{
 				"box": {
+					"id": "fl-master-lbl",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						75,
+						900,
+						65,
+						20
+					],
+					"text": "MASTER:",
+					"fontface": 1
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-sub",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						145,
+						900,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-sub-p",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						225,
+						900,
+						140,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend master_subdivision"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-prob",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						375,
+						895,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-prob-p",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						410,
+						900,
+						140,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend master_probability"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-prob-l",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						375,
+						927,
+						35,
+						20
+					],
+					"text": "PROB",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-hum",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						555,
+						895,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-hum-p",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						590,
+						900,
+						140,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend master_humanize"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-hum-l",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						555,
+						927,
+						45,
+						20
+					],
+					"text": "HUMAN",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-burst",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						735,
+						900,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-burst-p",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						780,
+						900,
+						120,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend master_burst"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-m-burst-l",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						735,
+						925,
+						45,
+						20
+					],
+					"text": "BURST",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
 					"id": "fl-tp-0",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -3918,7 +4697,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						930,
+						945,
 						55,
 						20
 					],
@@ -3935,7 +4714,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						75,
-						948,
+						963,
 						75,
 						20
 					],
@@ -3964,7 +4743,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						155,
-						948,
+						963,
 						130,
 						22
 					],
@@ -3982,7 +4761,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						75,
-						970,
+						985,
 						30,
 						30
 					],
@@ -4000,7 +4779,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						110,
-						974,
+						989,
 						130,
 						22
 					],
@@ -4018,7 +4797,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						75,
-						992,
+						1007,
 						30,
 						30
 					],
@@ -4036,7 +4815,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						110,
-						996,
+						1011,
 						130,
 						22
 					],
@@ -4054,7 +4833,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						75,
-						1014,
+						1029,
 						40,
 						22
 					],
@@ -4074,7 +4853,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						120,
-						1014,
+						1029,
 						130,
 						22
 					],
@@ -4092,7 +4871,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						15,
-						950,
+						965,
 						55,
 						20
 					],
@@ -4108,7 +4887,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						15,
-						972,
+						987,
 						55,
 						20
 					],
@@ -4124,7 +4903,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						15,
-						994,
+						1009,
 						55,
 						20
 					],
@@ -4140,7 +4919,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						15,
-						1016,
+						1031,
 						55,
 						20
 					],
@@ -4156,7 +4935,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						225,
-						930,
+						945,
 						55,
 						20
 					],
@@ -4173,7 +4952,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						225,
-						948,
+						963,
 						75,
 						20
 					],
@@ -4202,7 +4981,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						305,
-						948,
+						963,
 						130,
 						22
 					],
@@ -4220,7 +4999,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						225,
-						970,
+						985,
 						30,
 						30
 					],
@@ -4238,7 +5017,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						260,
-						974,
+						989,
 						130,
 						22
 					],
@@ -4256,7 +5035,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						225,
-						992,
+						1007,
 						30,
 						30
 					],
@@ -4274,7 +5053,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						260,
-						996,
+						1011,
 						130,
 						22
 					],
@@ -4292,7 +5071,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						225,
-						1014,
+						1029,
 						40,
 						22
 					],
@@ -4312,7 +5091,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						270,
-						1014,
+						1029,
 						130,
 						22
 					],
@@ -4330,7 +5109,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						375,
-						930,
+						945,
 						55,
 						20
 					],
@@ -4347,7 +5126,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						375,
-						948,
+						963,
 						75,
 						20
 					],
@@ -4376,7 +5155,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						455,
-						948,
+						963,
 						130,
 						22
 					],
@@ -4394,7 +5173,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						375,
-						970,
+						985,
 						30,
 						30
 					],
@@ -4412,7 +5191,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						410,
-						974,
+						989,
 						130,
 						22
 					],
@@ -4430,7 +5209,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						375,
-						992,
+						1007,
 						30,
 						30
 					],
@@ -4448,7 +5227,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						410,
-						996,
+						1011,
 						130,
 						22
 					],
@@ -4466,7 +5245,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						375,
-						1014,
+						1029,
 						40,
 						22
 					],
@@ -4486,7 +5265,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						420,
-						1014,
+						1029,
 						130,
 						22
 					],
@@ -4504,7 +5283,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						525,
-						930,
+						945,
 						55,
 						20
 					],
@@ -4521,7 +5300,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						525,
-						948,
+						963,
 						75,
 						20
 					],
@@ -4550,7 +5329,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						605,
-						948,
+						963,
 						130,
 						22
 					],
@@ -4568,7 +5347,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						525,
-						970,
+						985,
 						30,
 						30
 					],
@@ -4586,7 +5365,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						560,
-						974,
+						989,
 						130,
 						22
 					],
@@ -4604,7 +5383,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						525,
-						992,
+						1007,
 						30,
 						30
 					],
@@ -4622,7 +5401,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						560,
-						996,
+						1011,
 						130,
 						22
 					],
@@ -4640,7 +5419,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						525,
-						1014,
+						1029,
 						40,
 						22
 					],
@@ -4660,7 +5439,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						570,
-						1014,
+						1029,
 						130,
 						22
 					],
@@ -4678,7 +5457,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						675,
-						930,
+						945,
 						55,
 						20
 					],
@@ -4695,7 +5474,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						675,
-						948,
+						963,
 						75,
 						20
 					],
@@ -4724,7 +5503,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						755,
-						948,
+						963,
 						130,
 						22
 					],
@@ -4742,7 +5521,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						675,
-						970,
+						985,
 						30,
 						30
 					],
@@ -4760,7 +5539,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						710,
-						974,
+						989,
 						130,
 						22
 					],
@@ -4778,7 +5557,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						675,
-						992,
+						1007,
 						30,
 						30
 					],
@@ -4796,7 +5575,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						710,
-						996,
+						1011,
 						130,
 						22
 					],
@@ -4814,7 +5593,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						675,
-						1014,
+						1029,
 						40,
 						22
 					],
@@ -4834,7 +5613,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						720,
-						1014,
+						1029,
 						130,
 						22
 					],
@@ -4852,7 +5631,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						825,
-						930,
+						945,
 						55,
 						20
 					],
@@ -4869,7 +5648,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						825,
-						948,
+						963,
 						75,
 						20
 					],
@@ -4898,7 +5677,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						905,
-						948,
+						963,
 						130,
 						22
 					],
@@ -4916,7 +5695,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						825,
-						970,
+						985,
 						30,
 						30
 					],
@@ -4934,7 +5713,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						860,
-						974,
+						989,
 						130,
 						22
 					],
@@ -4952,7 +5731,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						825,
-						992,
+						1007,
 						30,
 						30
 					],
@@ -4970,7 +5749,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						860,
-						996,
+						1011,
 						130,
 						22
 					],
@@ -4988,7 +5767,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						825,
-						1014,
+						1029,
 						40,
 						22
 					],
@@ -5008,7 +5787,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						870,
-						1014,
+						1029,
 						130,
 						22
 					],
@@ -5026,7 +5805,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						75,
-						1040,
+						1055,
 						140,
 						22
 					],
@@ -5064,7 +5843,7 @@
 					"id": "km-js",
 					"maxclass": "newobj",
 					"numinlets": 1,
-					"numoutlets": 5,
+					"numoutlets": 6,
 					"patching_rect": [
 						75,
 						1020,
@@ -5072,6 +5851,7 @@
 						22
 					],
 					"outlettype": [
+						"",
 						"",
 						"",
 						"",
@@ -5101,6 +5881,120 @@
 			},
 			{
 				"box": {
+					"id": "km-lvl-route",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 7,
+					"patching_rect": [
+						75,
+						1050,
+						250,
+						22
+					],
+					"outlettype": [
+						"",
+						"",
+						"",
+						"",
+						"",
+						"",
+						""
+					],
+					"text": "route 0 1 2 3 4 5"
+				}
+			},
+			{
+				"box": {
+					"id": "km-lvl-snd-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						75,
+						1075,
+						85,
+						22
+					],
+					"text": "send v0_level"
+				}
+			},
+			{
+				"box": {
+					"id": "km-lvl-snd-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						195,
+						1075,
+						85,
+						22
+					],
+					"text": "send v1_level"
+				}
+			},
+			{
+				"box": {
+					"id": "km-lvl-snd-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						315,
+						1075,
+						85,
+						22
+					],
+					"text": "send v2_level"
+				}
+			},
+			{
+				"box": {
+					"id": "km-lvl-snd-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						435,
+						1075,
+						85,
+						22
+					],
+					"text": "send v3_level"
+				}
+			},
+			{
+				"box": {
+					"id": "km-lvl-snd-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						555,
+						1075,
+						85,
+						22
+					],
+					"text": "send v4_level"
+				}
+			},
+			{
+				"box": {
+					"id": "km-lvl-snd-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						675,
+						1075,
+						85,
+						22
+					],
+					"text": "send v5_level"
+				}
+			},
+			{
+				"box": {
 					"id": "km-pcell",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -5125,7 +6019,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						75,
-						1075,
+						1100,
 						130,
 						22
 					],
@@ -5143,7 +6037,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						195,
-						1075,
+						1100,
 						130,
 						22
 					],
@@ -5161,7 +6055,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						315,
-						1075,
+						1100,
 						130,
 						22
 					],
@@ -5179,7 +6073,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						435,
-						1075,
+						1100,
 						130,
 						22
 					],
@@ -5197,7 +6091,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						555,
-						1075,
+						1100,
 						130,
 						22
 					],
@@ -5215,7 +6109,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						675,
-						1075,
+						1100,
 						130,
 						22
 					],
@@ -5233,7 +6127,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						1105,
+						1130,
 						45,
 						20
 					],
@@ -5249,7 +6143,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						1135,
+						1160,
 						45,
 						20
 					],
@@ -5265,7 +6159,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						125,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5283,7 +6177,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						173,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5299,7 +6193,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						125,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5317,7 +6211,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						230,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5335,7 +6229,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						278,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5351,7 +6245,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						230,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5369,7 +6263,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						335,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5387,7 +6281,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						383,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5403,7 +6297,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						335,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5421,7 +6315,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						440,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5439,7 +6333,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						488,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5455,7 +6349,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						440,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5473,7 +6367,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						545,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5491,7 +6385,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						593,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5507,7 +6401,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						545,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5525,7 +6419,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						650,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5543,7 +6437,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						698,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5559,7 +6453,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						650,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5577,7 +6471,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						755,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5595,7 +6489,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						803,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5611,7 +6505,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						755,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5629,7 +6523,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						860,
-						1105,
+						1130,
 						45,
 						22
 					],
@@ -5647,7 +6541,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						908,
-						1105,
+						1130,
 						50,
 						20
 					],
@@ -5663,7 +6557,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						860,
-						1135,
+						1160,
 						45,
 						22
 					],
@@ -5681,7 +6575,7 @@
 					"numoutlets": 3,
 					"patching_rect": [
 						75,
-						1165,
+						1190,
 						200,
 						22
 					],
@@ -5701,7 +6595,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						285,
-						1165,
+						1190,
 						300,
 						20
 					],
@@ -6478,6 +7372,66 @@
 			{
 				"patchline": {
 					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"vld-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vld-0",
+						0
+					],
+					"destination": [
+						"vlf-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlr-0",
+						0
+					],
+					"destination": [
+						"vls-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vls-0",
+						0
+					],
+					"destination": [
+						"vlf-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-0",
+						0
+					],
+					"destination": [
+						"vl-0",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"sq-js",
 						0
 					],
@@ -6544,6 +7498,90 @@
 					"destination": [
 						"vs-0",
 						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-0",
+						0
+					],
+					"destination": [
+						"vlk-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlk-0",
+						0
+					],
+					"destination": [
+						"km-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"vld-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vld-1",
+						0
+					],
+					"destination": [
+						"vlf-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlr-1",
+						0
+					],
+					"destination": [
+						"vls-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vls-1",
+						0
+					],
+					"destination": [
+						"vlf-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-1",
+						0
+					],
+					"destination": [
+						"vl-1",
+						1
 					]
 				}
 			},
@@ -6622,6 +7660,90 @@
 			{
 				"patchline": {
 					"source": [
+						"vlf-1",
+						0
+					],
+					"destination": [
+						"vlk-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlk-1",
+						0
+					],
+					"destination": [
+						"km-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"vld-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vld-2",
+						0
+					],
+					"destination": [
+						"vlf-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlr-2",
+						0
+					],
+					"destination": [
+						"vls-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vls-2",
+						0
+					],
+					"destination": [
+						"vlf-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-2",
+						0
+					],
+					"destination": [
+						"vl-2",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"sq-js",
 						2
 					],
@@ -6688,6 +7810,90 @@
 					"destination": [
 						"vs-2",
 						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-2",
+						0
+					],
+					"destination": [
+						"vlk-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlk-2",
+						0
+					],
+					"destination": [
+						"km-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"vld-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vld-3",
+						0
+					],
+					"destination": [
+						"vlf-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlr-3",
+						0
+					],
+					"destination": [
+						"vls-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vls-3",
+						0
+					],
+					"destination": [
+						"vlf-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-3",
+						0
+					],
+					"destination": [
+						"vl-3",
+						1
 					]
 				}
 			},
@@ -6766,6 +7972,90 @@
 			{
 				"patchline": {
 					"source": [
+						"vlf-3",
+						0
+					],
+					"destination": [
+						"vlk-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlk-3",
+						0
+					],
+					"destination": [
+						"km-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"vld-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vld-4",
+						0
+					],
+					"destination": [
+						"vlf-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlr-4",
+						0
+					],
+					"destination": [
+						"vls-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vls-4",
+						0
+					],
+					"destination": [
+						"vlf-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-4",
+						0
+					],
+					"destination": [
+						"vl-4",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"sq-js",
 						4
 					],
@@ -6838,6 +8128,90 @@
 			{
 				"patchline": {
 					"source": [
+						"vlf-4",
+						0
+					],
+					"destination": [
+						"vlk-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlk-4",
+						0
+					],
+					"destination": [
+						"km-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"vld-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vld-5",
+						0
+					],
+					"destination": [
+						"vlf-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlr-5",
+						0
+					],
+					"destination": [
+						"vls-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vls-5",
+						0
+					],
+					"destination": [
+						"vlf-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-5",
+						0
+					],
+					"destination": [
+						"vl-5",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"sq-js",
 						5
 					],
@@ -6903,6 +8277,30 @@
 					],
 					"destination": [
 						"vs-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlf-5",
+						0
+					],
+					"destination": [
+						"vlk-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"vlk-5",
+						0
+					],
+					"destination": [
+						"km-js",
 						0
 					]
 				}
@@ -7839,6 +9237,102 @@
 					],
 					"destination": [
 						"vc-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-sub",
+						0
+					],
+					"destination": [
+						"fl-m-sub-p",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-sub-p",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-prob",
+						0
+					],
+					"destination": [
+						"fl-m-prob-p",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-prob-p",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-hum",
+						0
+					],
+					"destination": [
+						"fl-m-hum-p",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-hum-p",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-burst",
+						0
+					],
+					"destination": [
+						"fl-m-burst-p",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-m-burst-p",
+						0
+					],
+					"destination": [
+						"fl-js",
 						1
 					]
 				}
@@ -9016,6 +10510,90 @@
 					"destination": [
 						"fl-js",
 						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-js",
+						5
+					],
+					"destination": [
+						"km-lvl-route",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-lvl-route",
+						0
+					],
+					"destination": [
+						"km-lvl-snd-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-lvl-route",
+						1
+					],
+					"destination": [
+						"km-lvl-snd-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-lvl-route",
+						2
+					],
+					"destination": [
+						"km-lvl-snd-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-lvl-route",
+						3
+					],
+					"destination": [
+						"km-lvl-snd-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-lvl-route",
+						4
+					],
+					"destination": [
+						"km-lvl-snd-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-lvl-route",
+						5
+					],
+					"destination": [
+						"km-lvl-snd-5",
+						0
 					]
 				}
 			},

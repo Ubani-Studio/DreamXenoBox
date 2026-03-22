@@ -127,6 +127,24 @@ function tempo(ms) {
 	ms_per_step = Math.max(10, ms);
 }
 
+// ── Master controls (apply to all voices) ──
+
+function master_subdivision(val) {
+	for (var i = 0; i < NUM_VOICES; i++) subdivision(i, val);
+}
+
+function master_probability(val) {
+	for (var i = 0; i < NUM_VOICES; i++) probability(i, val);
+}
+
+function master_humanize(val) {
+	for (var i = 0; i < NUM_VOICES; i++) humanize(i, val);
+}
+
+function master_burst(val) {
+	for (var i = 0; i < NUM_VOICES; i++) burst(i, val);
+}
+
 // ── State access for kit manager ──
 
 function get_state() {
@@ -166,6 +184,10 @@ function anything() {
 		else if (msg === "probability") probability(args[0], args[1]);
 		else if (msg === "humanize") humanize(args[0], args[1]);
 		else if (msg === "burst") burst(args[0], args[1]);
+		else if (msg === "master_subdivision") master_subdivision(args[0]);
+		else if (msg === "master_probability") master_probability(args[0]);
+		else if (msg === "master_humanize") master_humanize(args[0]);
+		else if (msg === "master_burst") master_burst(args[0]);
 		else if (msg === "get_state") get_state();
 		else if (msg === "restore_voice") restore_voice(args[0], args[1], args[2], args[3], args[4]);
 	} else if (inlet === 2) {

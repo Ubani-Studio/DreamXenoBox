@@ -104,14 +104,14 @@ fb_lp = fb_hp + (fb_state - fb_hp) * hp_c;
 fb_hp = fb_lp;
 fb_hpf = fb_state - fb_lp;
 fb_ltd = tanh(fb_hpf * 2) * 0.5;
-bl_rate = 0.000005 + (1 - bloom) * 0.0003;
+bl_rate = 0.000001 + (1 - bloom) * 0.0003;
 halo_env = halo_env * (1 - bl_rate);
 fb_sig = fb_ltd * fb_gain * halo_env;
 body_input = exciter_out + fb_sig;
 
-eff_decay = decay_ms * decay_ms * 1.25;
-decay_norm = clamp(eff_decay / 8000, 0, 1);
-eff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);
+eff_decay = decay_ms * decay_ms * 2.5;
+decay_norm = clamp(eff_decay / 16000, 0, 1);
+eff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);
 
 body_out = 0;
 if (body_type < 0.5) {
@@ -133,7 +133,7 @@ if (body_type < 0.5) {
     ry2_d = ry1_d; ry1_d = yd;
     body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;
 } else if (body_type < 1.5) {
-    d_samps = clamp(samplerate / body_freq, 2, 8000);
+    d_samps = clamp(samplerate / base_freq, 2, 8000);
     fb = eff_Q * 0.9;
     delayed = comb_d.read(d_samps);
     d_coeff = 0.3 + fatigue * 0.4;
@@ -141,7 +141,7 @@ if (body_type < 0.5) {
     comb_d.write(body_input + comb_lp * fb);
     body_out = delayed;
 } else if (body_type < 2.5) {
-    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);
+    cav_len = clamp(samplerate / base_freq, 2, 8000);
     cav_fb = eff_Q * (0.85 + pressure * 0.1);
     cav_fb = clamp(cav_fb, 0, 0.995);
     cav_del = cav_d.read(cav_len);
@@ -152,7 +152,7 @@ if (body_type < 0.5) {
     r1 = eff_Q * 0.95;
     ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
     ry2_a = ry1_a; ry1_a = ya;
-    body_out = (cav_del * 0.6 + ya * 0.4);
+    body_out = (cav_del * 0.4 + ya * 0.6);
 } else {
     mem_r1 = 1.0;
     mem_r2 = 1.594;
@@ -191,7 +191,8 @@ fb_state = fb_source;
 env_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);
 main_env = main_env * (1 - env_rate);
 
-out_env = max(main_env, halo_env * mist);
+bl_env = halo_env * mist;
+out_env = max(main_env, bl_env);
 out1 = fractured * out_env;""".strip()
 
 # ── Voice definitions ──
@@ -419,12 +420,34 @@ def build():
         box(f"vg-{i}", "newobj", cx, Y_VOICES + 82, 130, 22,
             "gen~", ot=["signal"], patcher=gen_patcher())
 
-        # *~ level
-        box(f"vl-{i}", "newobj", cx, Y_VOICES + 112, 55, 22,
-            f"*~ {v['level']}", ni=2, ot=["signal"])
+        # *~ level (controllable)
+        box(f"vl-{i}", "newobj", cx, Y_VOICES + 112, 40, 22,
+            "*~ 1.", ni=2, ot=["signal"])
+
+        # Level control: flonum + receive for kit restore
+        box(f"vlf-{i}", "flonum", cx + 45, Y_VOICES + 112, 45, 22,
+            no=2, ot=["float", "bang"],
+            minimum=0.0, maximum=1.0, numdecimalplaces=2)
+        box(f"vlr-{i}", "newobj", cx + 95, Y_VOICES + 112, 85, 22,
+            f"receive v{i}_level", ot=[""])
+        box(f"vls-{i}", "message", cx + 95, Y_VOICES + 135, 50, 22,
+            "set $1", ni=2, ot=[""])
+
+        # Default level on load
+        box(f"vld-{i}", "message", cx + 45, Y_VOICES + 135, 40, 22,
+            str(v["level"]), ni=2, ot=[""])
+        wire("tr-lb", 0, f"vld-{i}", 0)
+        wire(f"vld-{i}", 0, f"vlf-{i}", 0)
+
+        # Kit restore → set flonum
+        wire(f"vlr-{i}", 0, f"vls-{i}", 0)
+        wire(f"vls-{i}", 0, f"vlf-{i}", 0)
+
+        # Flonum → *~ right inlet
+        wire(f"vlf-{i}", 0, f"vl-{i}", 1)
 
         # send~ audio to mixer
-        box(f"vs-{i}", "newobj", cx, Y_VOICES + 142, 80, 22,
+        box(f"vs-{i}", "newobj", cx, Y_VOICES + 160, 80, 22,
             f"send~ v{i}_out", ni=1, no=0)
 
         # Wiring: JS outlet → click~ → gen~ → *~ → send~
@@ -434,6 +457,12 @@ def build():
         wire(f"vr-{i}", 0, f"vg-{i}", 0)   # params → gen~
         wire(f"vg-{i}", 0, f"vl-{i}", 0)
         wire(f"vl-{i}", 0, f"vs-{i}", 0)
+
+        # Level → kit manager notification
+        box(f"vlk-{i}", "newobj", cx + 45, Y_VOICES + 160, 120, 22,
+            f"prepend voice_level {i}", ot=[""])
+        wire(f"vlf-{i}", 0, f"vlk-{i}", 0)
+        wire(f"vlk-{i}", 0, "km-js", 0)
 
     # ═══════════════════════ MIXER ═══════════════════════
     section_header("sec-mx", 30, Y_MIXER - 15, "MIXER")
@@ -573,6 +602,41 @@ def build():
         "js flamengine.js", ni=3, no=7,
         ot=["bang", "bang", "bang", "bang", "bang", "bang", ""])
 
+    # Master flam controls (single row above per-voice)
+    comment("fl-master-lbl", 75, Y_FLAM + 30, "MASTER:", fontface=1, w=65)
+
+    box("fl-m-sub", "umenu", 145, Y_FLAM + 30, 75, 20,
+        no=2, ot=["int", ""],
+        items=["OFF", ",", "1/32", ",", "1/48", ",", "1/64", ",", "1/96"])
+    box("fl-m-sub-p", "newobj", 225, Y_FLAM + 30, 140, 22,
+        "prepend master_subdivision", ot=[""])
+    wire("fl-m-sub", 0, "fl-m-sub-p", 0)
+    wire("fl-m-sub-p", 0, "fl-js", 1)
+
+    box("fl-m-prob", "dial", 375, Y_FLAM + 25, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    box("fl-m-prob-p", "newobj", 410, Y_FLAM + 30, 140, 22,
+        "prepend master_probability", ot=[""])
+    comment("fl-m-prob-l", 375, Y_FLAM + 57, "PROB", fontsize=9.0, w=35)
+    wire("fl-m-prob", 0, "fl-m-prob-p", 0)
+    wire("fl-m-prob-p", 0, "fl-js", 1)
+
+    box("fl-m-hum", "dial", 555, Y_FLAM + 25, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    box("fl-m-hum-p", "newobj", 590, Y_FLAM + 30, 140, 22,
+        "prepend master_humanize", ot=[""])
+    comment("fl-m-hum-l", 555, Y_FLAM + 57, "HUMAN", fontsize=9.0, w=45)
+    wire("fl-m-hum", 0, "fl-m-hum-p", 0)
+    wire("fl-m-hum-p", 0, "fl-js", 1)
+
+    box("fl-m-burst", "number", 735, Y_FLAM + 30, 40, 22,
+        no=2, ot=["int", "bang"], minimum=1, maximum=8)
+    box("fl-m-burst-p", "newobj", 780, Y_FLAM + 30, 120, 22,
+        "prepend master_burst", ot=[""])
+    comment("fl-m-burst-l", 735, Y_FLAM + 55, "BURST", fontsize=9.0, w=45)
+    wire("fl-m-burst", 0, "fl-m-burst-p", 0)
+    wire("fl-m-burst-p", 0, "fl-js", 1)
+
     # Tap sequencer outlets → prepend trig N → flam engine inlet 0
     for i in range(6):
         fx = VOICE_COLS[i]
@@ -595,7 +659,7 @@ def build():
     FLAM_PARAMS = ["subdivision", "probability", "humanize", "burst"]
     FLAM_LABELS = ["SUBDIV", "PROB %", "HUMAN", "BURST"]
 
-    flam_ctrl_y = Y_FLAM + 60
+    flam_ctrl_y = Y_FLAM + 75
 
     for i in range(6):
         fx = VOICE_COLS[i]
@@ -651,10 +715,10 @@ def build():
     # ═══════════════════════ KIT MANAGER ═══════════════════════
     section_header("sec-km", 30, Y_KITS - 15, "KITS")
 
-    # Kit manager JS (5 outlets: params, patterns, lengths, status, flam)
+    # Kit manager JS (6 outlets: params, patterns, lengths, status, flam, levels)
     box("km-js", "newobj", 75, Y_KITS, 750, 22,
-        "js kitmanager.js", ni=1, no=5,
-        ot=["", "", "", "", ""])
+        "js kitmanager.js", ni=1, no=6,
+        ot=["", "", "", "", "", ""])
 
     # Init kit manager on load
     box("km-init", "message", 855, Y_KITS, 70, 22,
@@ -674,6 +738,15 @@ def build():
     # Kit manager outlet 4 → flam engine (flam restore)
     wire("km-js", 4, "fl-js", 1)
 
+    # Kit manager outlet 5 → level restore via route → send
+    box("km-lvl-route", "newobj", 75, Y_KITS + 30, 250, 22,
+        "route 0 1 2 3 4 5", ni=1, no=7, ot=[""] * 7)
+    wire("km-js", 5, "km-lvl-route", 0)
+    for i in range(6):
+        box(f"km-lvl-snd-{i}", "newobj", 75 + i * 120, Y_KITS + 55, 85, 22,
+            f"send v{i}_level", ni=1, no=0)
+        wire("km-lvl-route", i, f"km-lvl-snd-{i}", 0)
+
     # Voicectrl outlet 7 → kit manager (param change notifications)
     wire("vc-js", 7, "km-js", 0)
 
@@ -685,7 +758,7 @@ def build():
 
     # Length changes → kit manager
     for i in range(6):
-        box(f"km-len-{i}", "newobj", 75 + i * 120, Y_KITS + 55, 130, 22,
+        box(f"km-len-{i}", "newobj", 75 + i * 120, Y_KITS + 80, 130, 22,
             f"prepend voice_length {i}", ot=[""])
         wire(f"len-{i}", 0, f"km-len-{i}", 0)
         wire(f"km-len-{i}", 0, "km-js", 0)
@@ -695,33 +768,33 @@ def build():
     kit_btn_w = 80
     kit_btn_spacing = 105
 
-    comment("km-sv-lbl", kit_x, Y_KITS + 85, "SAVE:", fontface=1, w=45)
-    comment("km-ld-lbl", kit_x, Y_KITS + 115, "LOAD:", fontface=1, w=45)
+    comment("km-sv-lbl", kit_x, Y_KITS + 110, "SAVE:", fontface=1, w=45)
+    comment("km-ld-lbl", kit_x, Y_KITS + 140, "LOAD:", fontface=1, w=45)
 
     for k in range(NUM_SLOTS):
         kx = kit_x + 50 + k * kit_btn_spacing
 
         # Save button
-        box(f"km-sv-{k}", "message", kx, Y_KITS + 85, 45, 22,
+        box(f"km-sv-{k}", "message", kx, Y_KITS + 110, 45, 22,
             f"save {k}", ni=2, ot=[""])
         wire(f"km-sv-{k}", 0, "km-js", 0)
 
         # Kit name label (updated by kit manager outlet 3)
-        box(f"km-nm-{k}", "comment", kx + 48, Y_KITS + 85, 50, 20,
+        box(f"km-nm-{k}", "comment", kx + 48, Y_KITS + 110, 50, 20,
             f"---", no=0, fontsize=10.0)
 
         # Load button
-        box(f"km-ld-{k}", "message", kx, Y_KITS + 115, 45, 22,
+        box(f"km-ld-{k}", "message", kx, Y_KITS + 140, 45, 22,
             f"load {k}", ni=2, ot=[""])
         wire(f"km-ld-{k}", 0, "km-js", 0)
 
     # Status display (kit manager outlet 3)
-    box("km-status-route", "newobj", 75, Y_KITS + 145, 200, 22,
+    box("km-status-route", "newobj", 75, Y_KITS + 170, 200, 22,
         "route status kit_name", ni=1, no=3, ot=["", "", ""])
     wire("km-js", 3, "km-status-route", 0)
 
     # Status text display
-    comment("km-status", 285, Y_KITS + 145, "", w=300, fontsize=11.0)
+    comment("km-status", 285, Y_KITS + 170, "", w=300, fontsize=11.0)
 
     # ═══════════════════════ MIDI INPUT ═══════════════════════
     section_header("sec-mi", 30, Y_MIDI - 15, "MIDI INPUT")

@@ -5,9 +5,10 @@
 // outlet 2: length restore messages (setlength_idx voice idx) → sequencer
 // outlet 3: status/UI messages (kit_name, kit_names list)
 // outlet 4: flam restore messages → flamengine
+// outlet 5: level restore messages → send v{i}_level
 
 inlets = 1;
-outlets = 5;
+outlets = 6;
 
 var NUM_VOICES = 6;
 var MAX_STEPS = 32;
@@ -35,6 +36,7 @@ var cur_flam = [];
 for (var _fi = 0; _fi < NUM_VOICES; _fi++) {
 	cur_flam[_fi] = {subdivision: 0, probability: 50, humanize: 0, burst: 1};
 }
+var cur_levels = [0.5, 0.3, 0.25, 0.3, 0.35, 0.2];
 
 // Length index map (matches sequencer.js)
 var LEN_MAP = [4, 8, 12, 16, 24, 32];
@@ -57,8 +59,8 @@ function init_defaults() {
 		{pitch:40, decay_ms:32, exciter_type:0, body_type:3,
 		 stress:0.7, bloom:0.4, scar:0.7, weight:0.8,
 		 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5},
-		{pitch:72, decay_ms:45, exciter_type:1, body_type:0,
-		 stress:0.6, bloom:0.85, scar:0.4, weight:0.2,
+		{pitch:72, decay_ms:60, exciter_type:1, body_type:2,
+		 stress:0.6, bloom:0.95, scar:0.4, weight:0.2,
 		 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4}
 	];
 
@@ -88,7 +90,8 @@ function snapshot() {
 		voices: [],
 		patterns: [],
 		lengths: cur_lengths.slice(),
-		flam: []
+		flam: [],
+		levels: cur_levels.slice()
 	};
 	for (var i = 0; i < NUM_VOICES; i++) {
 		var v = {};
@@ -139,6 +142,14 @@ function flam_param(param, voice, value) {
 	voice = Math.floor(voice);
 	if (voice >= 0 && voice < NUM_VOICES && cur_flam[voice]) {
 		cur_flam[voice][param] = value;
+	}
+}
+
+// Update current level state
+function voice_level(voice, value) {
+	voice = Math.floor(voice);
+	if (voice >= 0 && voice < NUM_VOICES) {
+		cur_levels[voice] = value;
 	}
 }
 
@@ -201,6 +212,14 @@ function load(slot) {
 		outlet(2, "setlength_idx", i3, idx);
 	}
 
+	// Restore levels → outlet 5
+	if (kit.levels) {
+		for (var i5 = 0; i5 < NUM_VOICES; i5++) {
+			cur_levels[i5] = kit.levels[i5];
+			outlet(5, i5, kit.levels[i5]);
+		}
+	}
+
 	// Restore flam params → outlet 4
 	if (kit.flam) {
 		for (var i4 = 0; i4 < NUM_VOICES; i4++) {
@@ -257,6 +276,8 @@ function anything() {
 		pattern_cell(args[0], args[1], args[2]);
 	} else if (msg === "voice_length") {
 		voice_length(args[0], args[1]);
+	} else if (msg === "voice_level") {
+		voice_level(args[0], args[1]);
 	} else if (msg === "flam_param") {
 		// args: param_name, voice_index, value
 		flam_param(args[0], args[1], args[2]);

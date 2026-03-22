@@ -123,16 +123,16 @@ fb_hpf = fb_state - fb_lp;
 // Soft limit feedback to prevent blowup
 fb_ltd = tanh(fb_hpf * 2) * 0.5;
 // Feedback envelope: bloom controls sustain duration
-bl_rate = 0.000005 + (1 - bloom) * 0.0003;
+bl_rate = 0.000001 + (1 - bloom) * 0.0003;
 halo_env = halo_env * (1 - bl_rate);
 fb_sig = fb_ltd * fb_gain * halo_env;
 body_input = exciter_out + fb_sig;
 
 // ── DECAY (non-linear: squared for exponential feel) ──
-// decay_ms dial range [5, 80]. Squared × 1.25: 31ms → 8000ms actual
-eff_decay = decay_ms * decay_ms * 1.25;
-decay_norm = clamp(eff_decay / 8000, 0, 1);
-eff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);
+// decay_ms dial range [5, 80]. Squared × 2.5: 62ms → 16000ms actual
+eff_decay = decay_ms * decay_ms * 2.5;
+decay_norm = clamp(eff_decay / 16000, 0, 1);
+eff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);
 
 // ── BODY ──
 // 0: Inharmonic resonator bank (4 parallel biquads)
@@ -160,8 +160,8 @@ if (body_type < 0.5) {
     ry2_d = ry1_d; ry1_d = yd;
     body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;
 } else if (body_type < 1.5) {
-    // Type 1: Dispersive comb filter
-    d_samps = clamp(samplerate / body_freq, 2, 8000);
+    // Type 1: Dispersive comb filter (uses base_freq for tight timing)
+    d_samps = clamp(samplerate / base_freq, 2, 8000);
     fb = eff_Q * 0.9;
     delayed = comb_d.read(d_samps);
     d_coeff = 0.3 + fatigue * 0.4;
@@ -169,10 +169,10 @@ if (body_type < 0.5) {
     comb_d.write(body_input + comb_lp * fb);
     body_out = delayed;
 } else if (body_type < 2.5) {
-    // Type 2: Pressure Cavity
-    // Comb at half body_freq (lower, more sub) + resonator for color
+    // Type 2: Pressure Cavity (uses base_freq for tight timing)
+    // Comb at base_freq + resonator at body_freq for sub bass color
     // Feedback tightens under pressure (hard hits compress), loosens as pressure decays
-    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);
+    cav_len = clamp(samplerate / base_freq, 2, 8000);
     cav_fb = eff_Q * (0.85 + pressure * 0.1);
     cav_fb = clamp(cav_fb, 0, 0.995);
     cav_del = cav_d.read(cav_len);
@@ -184,7 +184,7 @@ if (body_type < 0.5) {
     r1 = eff_Q * 0.95;
     ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
     ry2_a = ry1_a; ry1_a = ya;
-    body_out = (cav_del * 0.6 + ya * 0.4);
+    body_out = (cav_del * 0.4 + ya * 0.6);
 } else {
     // Type 3: Membrane (circular drum head, Bessel function mode ratios)
     // Ratios: 1.000, 1.594, 2.136, 2.296
@@ -233,5 +233,6 @@ fb_state = fb_source;
 env_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);
 main_env = main_env * (1 - env_rate);
 
-out_env = max(main_env, halo_env * mist);
+bl_env = halo_env * mist;
+out_env = max(main_env, bl_env);
 out1 = fractured * out_env;
