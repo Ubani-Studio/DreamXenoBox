@@ -37,22 +37,22 @@ var LEN_MAP = [4, 8, 12, 16, 24, 32];
 // Initialize current voice state from voicectrl defaults
 function init_defaults() {
 	cur_voices = [
-		{pitch:30, decay_ms:1200, exciter_type:0, body_type:1,
+		{pitch:30, decay_ms:55, exciter_type:0, body_type:2,
 		 stress:0.1, bloom:0.1, scar:0.05, weight:0.95,
 		 mist:0.0, heat_macro:0.3, drift_param:0.05, density_param:0.5},
-		{pitch:62, decay_ms:120, exciter_type:0, body_type:0,
+		{pitch:62, decay_ms:18, exciter_type:0, body_type:0,
 		 stress:0.4, bloom:0.2, scar:0.4, weight:0.4,
 		 mist:0.15, heat_macro:0.5, drift_param:0.05, density_param:0.5},
-		{pitch:84, decay_ms:60, exciter_type:1, body_type:0,
+		{pitch:84, decay_ms:12, exciter_type:1, body_type:0,
 		 stress:0.5, bloom:0.15, scar:0.6, weight:0.1,
 		 mist:0.3, heat_macro:0.7, drift_param:0.1, density_param:0.7},
-		{pitch:52, decay_ms:200, exciter_type:1, body_type:1,
+		{pitch:52, decay_ms:22, exciter_type:1, body_type:1,
 		 stress:0.2, bloom:0.3, scar:0.15, weight:0.6,
 		 mist:0.05, heat_macro:0.2, drift_param:0.02, density_param:0.4},
-		{pitch:40, decay_ms:400, exciter_type:0, body_type:1,
+		{pitch:40, decay_ms:32, exciter_type:0, body_type:3,
 		 stress:0.7, bloom:0.4, scar:0.7, weight:0.8,
 		 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5},
-		{pitch:72, decay_ms:800, exciter_type:1, body_type:0,
+		{pitch:72, decay_ms:45, exciter_type:1, body_type:0,
 		 stress:0.6, bloom:0.85, scar:0.4, weight:0.2,
 		 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4}
 	];

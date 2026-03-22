@@ -1,14 +1,13 @@
-// DREAM XENO BOX — Voice Engine v2
+// DREAM XENO BOX — Voice Engine v3
 // gen~ codebox: exciter → body → fracture → feedback resonance → memory
 // in1 = trigger signal (click~ or sig~), Params for all controls
 //
-// v2 changes:
-// - Decay-coupled Q: decay_ms drives resonator sustain, not just amplitude
-// - Pitch envelope: weight-scaled sweep for sub bass bounce (808-style)
-// - Feedback resonance: replaces noise veil halo. Output feeds back through
-//   highpass → tanh limiter → gain (mist×stress) → body input.
-//   Low mist = ghost notes. High mist + stress = Larsen screech.
-//   Bloom controls feedback sustain duration.
+// v3 changes:
+// - 4 body types: Resonator Bank, Dispersive Comb, Pressure Cavity, Membrane
+// - Non-linear decay: decay_ms squared for exponential feel
+//   (dial 0→5ms snap, dial max→6400ms sustain)
+// - Pressure Cavity: comb with pressure-dependent feedback — tightens on hard hits
+// - Membrane: Bessel function ratios (1.0, 1.594, 2.136, 2.296) for circular modes
 
 Param pitch(60);
 Param decay_ms(200);
@@ -42,10 +41,12 @@ History ry2_d(0);
 History comb_lp(0);
 History halo_env(0);
 History main_env(0);
-History pitch_env(0);    // NEW: pitch sweep envelope
-History fb_state(0);     // NEW: feedback resonance state (prev body output)
-History fb_hp(0);        // NEW: feedback highpass filter state
+History pitch_env(0);    // pitch sweep envelope
+History fb_state(0);     // feedback resonance state (prev body output)
+History fb_hp(0);        // feedback highpass filter state
+History cav_lp(0);       // pressure cavity lowpass state
 Delay comb_d(8820);
+Delay cav_d(8820);       // pressure cavity delay line
 
 // ── TRIGGER DETECTION ──
 trig_on = (in1 > 0.5) * (prev_trig <= 0.5);
@@ -58,7 +59,7 @@ if (trig_on) {
     exc_env = 1;
     halo_env = vel * mist;       // feedback gate opens proportional to mist
     main_env = vel;
-    pitch_env = vel;             // NEW: start pitch sweep
+    pitch_env = vel;             // start pitch sweep
 }
 
 // ── STATE DECAY ──
@@ -108,7 +109,7 @@ if (exciter_type < 0.5) {
     exciter_out = noise_filt * 4 * exc_env;
 }
 
-// ── FEEDBACK RESONANCE (replaces noise veil halo) ──
+// ── FEEDBACK RESONANCE ──
 // Previous body output → highpass → tanh limiter → gain → back into body
 // mist = feedback amount, stress adds edge, bloom = feedback sustain
 fb_gain = mist * (0.5 + stress * 0.5);
@@ -127,14 +128,20 @@ halo_env = halo_env * (1 - bl_rate);
 fb_sig = fb_ltd * fb_gain * halo_env;
 body_input = exciter_out + fb_sig;
 
-// ── BODY (decay-coupled Q) ──
-// Longer decay_ms → higher Q → resonators sustain longer
-decay_norm = clamp(decay_ms / 4000, 0, 1);
+// ── DECAY (non-linear: squared for exponential feel) ──
+// decay_ms dial range [5, 80]. Squared × 1.25: 31ms → 8000ms actual
+eff_decay = decay_ms * decay_ms * 1.25;
+decay_norm = clamp(eff_decay / 8000, 0, 1);
 eff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);
 
+// ── BODY ──
+// 0: Inharmonic resonator bank (4 parallel biquads)
+// 1: Dispersive comb filter
+// 2: Pressure cavity (comb + resonator, pressure-dependent feedback)
+// 3: Membrane (Bessel function mode ratios for circular drum head)
 body_out = 0;
 if (body_type < 0.5) {
-    // Inharmonic resonator bank (4 parallel biquads)
+    // Type 0: Inharmonic resonator bank
     w1 = twopi * body_freq * 1.0 / samplerate;
     r1 = eff_Q;
     ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
@@ -152,8 +159,8 @@ if (body_type < 0.5) {
     yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
     ry2_d = ry1_d; ry1_d = yd;
     body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;
-} else {
-    // Dispersive comb filter
+} else if (body_type < 1.5) {
+    // Type 1: Dispersive comb filter
     d_samps = clamp(samplerate / body_freq, 2, 8000);
     fb = eff_Q * 0.9;
     delayed = comb_d.read(d_samps);
@@ -161,6 +168,48 @@ if (body_type < 0.5) {
     comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;
     comb_d.write(body_input + comb_lp * fb);
     body_out = delayed;
+} else if (body_type < 2.5) {
+    // Type 2: Pressure Cavity
+    // Comb at half body_freq (lower, more sub) + resonator for color
+    // Feedback tightens under pressure (hard hits compress), loosens as pressure decays
+    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);
+    cav_fb = eff_Q * (0.85 + pressure * 0.1);
+    cav_fb = clamp(cav_fb, 0, 0.995);
+    cav_del = cav_d.read(cav_len);
+    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;
+    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;
+    cav_d.write(body_input + cav_lp * cav_fb);
+    // Add a resonator on top for tonal color
+    w1 = twopi * body_freq * 1.0 / samplerate;
+    r1 = eff_Q * 0.95;
+    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
+    ry2_a = ry1_a; ry1_a = ya;
+    body_out = (cav_del * 0.6 + ya * 0.4);
+} else {
+    // Type 3: Membrane (circular drum head, Bessel function mode ratios)
+    // Ratios: 1.000, 1.594, 2.136, 2.296
+    // Heavier fundamental weighting for deep bass character
+    mem_r1 = 1.0;
+    mem_r2 = 1.594;
+    mem_r3 = 2.136;
+    mem_r4 = 2.296;
+    w1 = twopi * body_freq * mem_r1 / samplerate;
+    r1 = eff_Q * 0.998;
+    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
+    ry2_a = ry1_a; ry1_a = ya;
+    w2 = twopi * body_freq * mem_r2 / samplerate;
+    r2 = eff_Q * 0.99;
+    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;
+    ry2_b = ry1_b; ry1_b = yb;
+    w3 = twopi * body_freq * mem_r3 / samplerate;
+    r3 = eff_Q * 0.985;
+    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;
+    ry2_c = ry1_c; ry1_c = yc;
+    w4 = twopi * body_freq * mem_r4 / samplerate;
+    r4 = eff_Q * 0.98;
+    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
+    ry2_d = ry1_d; ry1_d = yd;
+    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);
 }
 
 // ── FRACTURE (asymmetric wavefold) ──
@@ -179,8 +228,9 @@ fb_source = body_out * (1 - stress) + fractured * stress;
 fb_state = fb_source;
 
 // ── OUTPUT ENVELOPE ──
-// main_env = standard decay. halo_env * mist extends for feedback voices.
-env_rate = 1.0 / max(decay_ms * samplerate / 1000, 1);
+// main_env = standard decay (uses non-linear eff_decay)
+// halo_env * mist extends for feedback voices
+env_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);
 main_env = main_env * (1 - env_rate);
 
 out_env = max(main_env, halo_env * mist);

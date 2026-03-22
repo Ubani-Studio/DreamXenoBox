@@ -13,7 +13,7 @@ A 6-voice alien percussion instrument built in Max/MSP gen~. Each voice is a mat
 7. Select voice tabs to edit per-voice parameters
 8. Save/load kits with the SAVE/LOAD buttons (8 slots)
 
-## Voice Engine (v2)
+## Voice Engine (v3)
 
 Single gen~ codebox signal chain (same engine, 6 instances with different defaults):
 
@@ -24,21 +24,31 @@ Trigger → Exciter → Body → Fracture → Output
 ```
 
 - **Exciter**: FM impulse click or filtered noise burst
-- **Body**: 4-resonator inharmonic bank or dispersive comb filter. Decay-coupled Q — longer decay = higher resonator sustain
+- **Body**: 4 body types (see below). Decay-coupled Q — longer decay = higher resonator sustain
 - **Fracture**: Asymmetric wavefold distortion driven by accumulated pressure
 - **Feedback Resonance**: Body output feeds back through highpass → tanh limiter → gain into body input. Low mist = ghost notes. High mist + stress = Larsen screech. Bloom controls sustain.
 - **Pitch Envelope**: Weight-scaled sweep on trigger — heavy voices get 808-style sub bass bounce
+- **Decay**: Non-linear scaling (squared) — snappy at low end, massive sustain at max
 - **Memory**: Pressure, heat, fatigue, and stiffness accumulate per hit and decay over silence
+
+## 4 Body Types
+
+| Type | Name | Description |
+|------|------|-------------|
+| 0 | **Resonator Bank** | 4 parallel inharmonic biquads. Metallic, bell-like, pitched percussion. |
+| 1 | **Dispersive Comb** | Comb filter with lowpass in feedback. String/wood resonance. |
+| 2 | **Pressure Cavity** | Comb at half-freq + resonator. Feedback tightens under pressure (hard hits compress). Deep sub bass. |
+| 3 | **Membrane** | Bessel function mode ratios (1.0, 1.594, 2.136, 2.296). Circular drum head physics. Heavy fundamental. |
 
 ## 6 Voice Characters
 
 | Voice | Pitch | Material | Exciter | Body |
 |-------|-------|----------|---------|------|
-| **Mass** | 30 | Sub bass, seismic earth | FM impulse | Dispersive comb |
+| **Mass** | 30 | Sub bass, seismic earth | FM impulse | Pressure cavity |
 | **Vein** | 62 | Taut metal under tension | FM impulse | Resonator bank |
 | **Shard** | 84 | Brittle crystal, fractured glass | Noise burst | Resonator bank |
 | **Husk** | 52 | Dried hollow shell, dead wood | Noise burst | Dispersive comb |
-| **Fault** | 40 | Cracked earth, geological stress | FM impulse | Dispersive comb |
+| **Fault** | 40 | Cracked earth, geological stress | FM impulse | Membrane |
 | **Halo** | 72 | Feedback screech, ghost resonance | Noise burst | Resonator bank |
 
 ## 8 Macro Controls (per voice)

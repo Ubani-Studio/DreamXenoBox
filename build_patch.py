@@ -41,7 +41,9 @@ History main_env(0);
 History pitch_env(0);
 History fb_state(0);
 History fb_hp(0);
+History cav_lp(0);
 Delay comb_d(8820);
+Delay cav_d(8820);
 
 trig_on = (in1 > 0.5) * (prev_trig <= 0.5);
 vel = in1;
@@ -107,7 +109,8 @@ halo_env = halo_env * (1 - bl_rate);
 fb_sig = fb_ltd * fb_gain * halo_env;
 body_input = exciter_out + fb_sig;
 
-decay_norm = clamp(decay_ms / 4000, 0, 1);
+eff_decay = decay_ms * decay_ms * 1.25;
+decay_norm = clamp(eff_decay / 8000, 0, 1);
 eff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);
 
 body_out = 0;
@@ -129,7 +132,7 @@ if (body_type < 0.5) {
     yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
     ry2_d = ry1_d; ry1_d = yd;
     body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;
-} else {
+} else if (body_type < 1.5) {
     d_samps = clamp(samplerate / body_freq, 2, 8000);
     fb = eff_Q * 0.9;
     delayed = comb_d.read(d_samps);
@@ -137,6 +140,41 @@ if (body_type < 0.5) {
     comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;
     comb_d.write(body_input + comb_lp * fb);
     body_out = delayed;
+} else if (body_type < 2.5) {
+    cav_len = clamp(samplerate / (body_freq * 0.5), 2, 8000);
+    cav_fb = eff_Q * (0.85 + pressure * 0.1);
+    cav_fb = clamp(cav_fb, 0, 0.995);
+    cav_del = cav_d.read(cav_len);
+    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;
+    cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;
+    cav_d.write(body_input + cav_lp * cav_fb);
+    w1 = twopi * body_freq * 1.0 / samplerate;
+    r1 = eff_Q * 0.95;
+    ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
+    ry2_a = ry1_a; ry1_a = ya;
+    body_out = (cav_del * 0.6 + ya * 0.4);
+} else {
+    mem_r1 = 1.0;
+    mem_r2 = 1.594;
+    mem_r3 = 2.136;
+    mem_r4 = 2.296;
+    w1 = twopi * body_freq * mem_r1 / samplerate;
+    r1 = eff_Q * 0.998;
+    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
+    ry2_a = ry1_a; ry1_a = ya;
+    w2 = twopi * body_freq * mem_r2 / samplerate;
+    r2 = eff_Q * 0.99;
+    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;
+    ry2_b = ry1_b; ry1_b = yb;
+    w3 = twopi * body_freq * mem_r3 / samplerate;
+    r3 = eff_Q * 0.985;
+    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;
+    ry2_c = ry1_c; ry1_c = yc;
+    w4 = twopi * body_freq * mem_r4 / samplerate;
+    r4 = eff_Q * 0.98;
+    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
+    ry2_d = ry1_d; ry1_d = yd;
+    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);
 }
 
 fold_d = 1 + eff_scar * 4;
@@ -150,7 +188,7 @@ if (eff_scar > 0.01) {
 fb_source = body_out * (1 - stress) + fractured * stress;
 fb_state = fb_source;
 
-env_rate = 1.0 / max(decay_ms * samplerate / 1000, 1);
+env_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);
 main_env = main_env * (1 - env_rate);
 
 out_env = max(main_env, halo_env * mist);
@@ -491,7 +529,7 @@ def build():
 
     # UI update route (outlet 6 → route → set dials)
     all_params = MACROS + ["pitch", "decay_ms", "exciter_type", "body_type"]
-    all_labels = MACRO_LABELS + ["PITCH", "DECAY", "EXC TYPE", "BODY TYPE"]
+    all_labels = MACRO_LABELS + ["PITCH", "DECAY", "EXCITER", "BODY"]
     macro_route = "route " + " ".join(all_params)
     n_params = len(all_params)
 
