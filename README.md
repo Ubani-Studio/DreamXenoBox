@@ -64,12 +64,26 @@ Trigger → Exciter → Body → Fracture → Output
 | **Drift** | Pitch instability (noise x pressure) |
 | **Density** | Exciter burst length + bandwidth |
 
+## Flam Engine
+
+Sub-rhythmic burst generator per voice. Sits between sequencer and voice triggers.
+
+| Control | Range | Description |
+|---------|-------|-------------|
+| **Subdivision** | OFF, 1/32, 1/48, 1/64, 1/96 | How fast the sub-triggers fire |
+| **Probability** | 0-100% | Chance each sub-trigger fires (low = sparse ghost flams, high = rolls) |
+| **Humanize** | 0-100% | Random timing jitter per sub-trigger (organic feel) |
+| **Burst** | 1-8 | How many sub-hits after each main sequencer hit |
+
+When subdivision is OFF, voice behaves normally. When active, each sequencer hit spawns a cloud of micro-triggers at the chosen rate.
+
 ## Kit System
 
 8 kit slots store the complete instrument state:
 - All 6 voice parameters (72 values)
 - All sequencer patterns (6 × 32 steps)
 - Per-voice step lengths
+- Per-voice flam settings (subdivision, probability, humanize, burst)
 
 Kit 1 ("INIT") is auto-saved on load with default settings.
 
@@ -78,10 +92,11 @@ Kit 1 ("INIT") is auto-saved on load with default settings.
 ```
 TRANSPORT:  metro → counter → step dispatch
 SEQUENCER:  js sequencer.js (6 × 32 steps, polymetric lengths)
-VOICES:     6 × gen~ (v2 engine: feedback resonance, pitch envelope, decay-coupled Q)
+FLAM:       js flamengine.js (sub-rhythmic bursts, probability, humanize)
+VOICES:     6 × gen~ (v3 engine: 4 body types, feedback resonance, non-linear decay)
 MIXER:      send~/receive~ → +~ chain → gain~ → dac~
 EDITOR:     live.tab voice select → js voicectrl.js → send/receive → gen~
-KITS:       js kitmanager.js (8 slots, save/load/name)
+KITS:       js kitmanager.js (8 slots, save/load/name, includes flam state)
 MIDI:       notein → select → per-voice triggers
 ```
 
@@ -92,6 +107,7 @@ MIDI:       notein → select → per-voice triggers
 | `DreamXenoBox.maxpat` | Full 6-voice sequencer groovebox |
 | `DreamXenoBox_proto.maxpat` | Single-voice prototype for testing |
 | `sequencer.js` | Polymetric step sequencer dispatcher |
+| `flamengine.js` | Sub-rhythmic burst generator (flam/rolls/texture) |
 | `voicectrl.js` | Tabbed voice parameter editor |
 | `kitmanager.js` | Kit save/load/name manager (8 slots) |
 | `voice_engine.genexpr` | gen~ codebox source (reference) |
@@ -112,6 +128,8 @@ MIDI:       notein → select → per-voice triggers
 - [x] Stage 4: Per-voice macro controls + MIDI mapping
 - [x] Stage 4.5: Voice engine v2 (feedback resonance, sub bass, decay-coupled Q)
 - [x] Stage 4.6: Kit save/load system (8 slots)
+- [x] Stage 4.7: Voice engine v3 (4 body types, non-linear decay)
+- [x] Stage 4.8: Flam engine (sub-rhythmic bursts, probability, humanize)
 - [ ] Stage 5: Parameter locks (per-step macro overrides)
 - [ ] Stage 6: Global bus effects (saturation, void delay, matter dispersion)
 - [ ] Stage 7: Scene system (kit + transport, morph between scenes)

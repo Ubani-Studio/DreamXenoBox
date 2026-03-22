@@ -13,7 +13,7 @@
 			20,
 			40,
 			1160,
-			1180
+			1380
 		],
 		"bglocked": 0,
 		"openinpresentation": 0,
@@ -3667,13 +3667,1384 @@
 			},
 			{
 				"box": {
-					"id": "sec-km",
+					"id": "sec-fl",
 					"maxclass": "comment",
 					"numinlets": 1,
 					"numoutlets": 0,
 					"patching_rect": [
 						30,
 						855,
+						119,
+						20
+					],
+					"text": "FLAM ENGINE",
+					"fontface": 1,
+					"fontsize": 14.0,
+					"textcolor": [
+						0.3,
+						0.3,
+						0.3,
+						1.0
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-js",
+					"maxclass": "newobj",
+					"numinlets": 3,
+					"numoutlets": 7,
+					"patching_rect": [
+						75,
+						870,
+						750,
+						22
+					],
+					"outlettype": [
+						"bang",
+						"bang",
+						"bang",
+						"bang",
+						"bang",
+						"bang",
+						""
+					],
+					"text": "js flamengine.js"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-tp-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						75,
+						840,
+						95,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend trig 0"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-tp-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						225,
+						840,
+						95,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend trig 1"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-tp-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						375,
+						840,
+						95,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend trig 2"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-tp-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						525,
+						840,
+						95,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend trig 3"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-tp-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						675,
+						840,
+						95,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend trig 4"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-tp-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						825,
+						840,
+						95,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend trig 5"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-snd-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						75,
+						900,
+						80,
+						22
+					],
+					"text": "send v0_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-snd-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						225,
+						900,
+						80,
+						22
+					],
+					"text": "send v1_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-snd-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						375,
+						900,
+						80,
+						22
+					],
+					"text": "send v2_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-snd-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						525,
+						900,
+						80,
+						22
+					],
+					"text": "send v3_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-snd-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						675,
+						900,
+						80,
+						22
+					],
+					"text": "send v4_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-snd-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						825,
+						900,
+						80,
+						22
+					],
+					"text": "send v5_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-vl-0",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						75,
+						930,
+						55,
+						20
+					],
+					"text": "MASS",
+					"fontface": 1,
+					"fontsize": 10.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-0",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						75,
+						948,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-p-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						155,
+						948,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend subdivision 0"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-0",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						75,
+						970,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-p-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						110,
+						974,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend probability 0"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-0",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						75,
+						992,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-p-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						110,
+						996,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend humanize 0"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-0",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						75,
+						1014,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-p-0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						120,
+						1014,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend burst 0"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-lbl-0",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						15,
+						950,
+						55,
+						20
+					],
+					"text": "SUBDIV",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-lbl-1",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						15,
+						972,
+						55,
+						20
+					],
+					"text": "PROB %",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-lbl-2",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						15,
+						994,
+						55,
+						20
+					],
+					"text": "HUMAN",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-lbl-3",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						15,
+						1016,
+						55,
+						20
+					],
+					"text": "BURST",
+					"fontsize": 9.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-vl-1",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						225,
+						930,
+						55,
+						20
+					],
+					"text": "VEIN",
+					"fontface": 1,
+					"fontsize": 10.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-1",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						225,
+						948,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-p-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						305,
+						948,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend subdivision 1"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-1",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						225,
+						970,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-p-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						260,
+						974,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend probability 1"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-1",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						225,
+						992,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-p-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						260,
+						996,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend humanize 1"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-1",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						225,
+						1014,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-p-1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						270,
+						1014,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend burst 1"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-vl-2",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						375,
+						930,
+						55,
+						20
+					],
+					"text": "SHARD",
+					"fontface": 1,
+					"fontsize": 10.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-2",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						375,
+						948,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-p-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						455,
+						948,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend subdivision 2"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-2",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						375,
+						970,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-p-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						410,
+						974,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend probability 2"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-2",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						375,
+						992,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-p-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						410,
+						996,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend humanize 2"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-2",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						375,
+						1014,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-p-2",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						420,
+						1014,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend burst 2"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-vl-3",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						525,
+						930,
+						55,
+						20
+					],
+					"text": "HUSK",
+					"fontface": 1,
+					"fontsize": 10.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-3",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						525,
+						948,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-p-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						605,
+						948,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend subdivision 3"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-3",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						525,
+						970,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-p-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						560,
+						974,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend probability 3"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-3",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						525,
+						992,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-p-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						560,
+						996,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend humanize 3"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-3",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						525,
+						1014,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-p-3",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						570,
+						1014,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend burst 3"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-vl-4",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						675,
+						930,
+						55,
+						20
+					],
+					"text": "FAULT",
+					"fontface": 1,
+					"fontsize": 10.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-4",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						675,
+						948,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-p-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						755,
+						948,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend subdivision 4"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-4",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						675,
+						970,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-p-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						710,
+						974,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend probability 4"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-4",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						675,
+						992,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-p-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						710,
+						996,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend humanize 4"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-4",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						675,
+						1014,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-p-4",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						720,
+						1014,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend burst 4"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-vl-5",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						825,
+						930,
+						55,
+						20
+					],
+					"text": "HALO",
+					"fontface": 1,
+					"fontsize": 10.0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-5",
+					"maxclass": "umenu",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						825,
+						948,
+						75,
+						20
+					],
+					"outlettype": [
+						"int",
+						""
+					],
+					"items": [
+						"OFF",
+						",",
+						"1/32",
+						",",
+						"1/48",
+						",",
+						"1/64",
+						",",
+						"1/96"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-subdivision-p-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						905,
+						948,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend subdivision 5"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-5",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						825,
+						970,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-probability-p-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						860,
+						974,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend probability 5"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-5",
+					"maxclass": "dial",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						825,
+						992,
+						30,
+						30
+					],
+					"outlettype": [
+						"int"
+					],
+					"parameter_enable": 0
+				}
+			},
+			{
+				"box": {
+					"id": "fl-humanize-p-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						860,
+						996,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend humanize 5"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-5",
+					"maxclass": "number",
+					"numinlets": 1,
+					"numoutlets": 2,
+					"patching_rect": [
+						825,
+						1014,
+						40,
+						22
+					],
+					"outlettype": [
+						"int",
+						"bang"
+					],
+					"minimum": 1,
+					"maximum": 8
+				}
+			},
+			{
+				"box": {
+					"id": "fl-burst-p-5",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						870,
+						1014,
+						130,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend burst 5"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-km-notify",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						75,
+						1040,
+						140,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "prepend flam_param"
+				}
+			},
+			{
+				"box": {
+					"id": "sec-km",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						30,
+						1005,
 						56,
 						20
 					],
@@ -3693,14 +5064,15 @@
 					"id": "km-js",
 					"maxclass": "newobj",
 					"numinlets": 1,
-					"numoutlets": 4,
+					"numoutlets": 5,
 					"patching_rect": [
 						75,
-						870,
+						1020,
 						750,
 						22
 					],
 					"outlettype": [
+						"",
 						"",
 						"",
 						"",
@@ -3717,7 +5089,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						855,
-						870,
+						1020,
 						70,
 						22
 					],
@@ -3735,7 +5107,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						75,
-						900,
+						1050,
 						120,
 						22
 					],
@@ -3753,7 +5125,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						75,
-						925,
+						1075,
 						130,
 						22
 					],
@@ -3771,7 +5143,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						195,
-						925,
+						1075,
 						130,
 						22
 					],
@@ -3789,7 +5161,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						315,
-						925,
+						1075,
 						130,
 						22
 					],
@@ -3807,7 +5179,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						435,
-						925,
+						1075,
 						130,
 						22
 					],
@@ -3825,7 +5197,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						555,
-						925,
+						1075,
 						130,
 						22
 					],
@@ -3843,7 +5215,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						675,
-						925,
+						1075,
 						130,
 						22
 					],
@@ -3861,7 +5233,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						955,
+						1105,
 						45,
 						20
 					],
@@ -3877,7 +5249,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						985,
+						1135,
 						45,
 						20
 					],
@@ -3893,7 +5265,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						125,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -3911,7 +5283,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						173,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -3927,7 +5299,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						125,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -3945,7 +5317,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						230,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -3963,7 +5335,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						278,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -3979,7 +5351,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						230,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -3997,7 +5369,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						335,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -4015,7 +5387,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						383,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -4031,7 +5403,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						335,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -4049,7 +5421,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						440,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -4067,7 +5439,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						488,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -4083,7 +5455,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						440,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -4101,7 +5473,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						545,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -4119,7 +5491,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						593,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -4135,7 +5507,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						545,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -4153,7 +5525,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						650,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -4171,7 +5543,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						698,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -4187,7 +5559,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						650,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -4205,7 +5577,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						755,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -4223,7 +5595,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						803,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -4239,7 +5611,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						755,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -4257,7 +5629,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						860,
-						955,
+						1105,
 						45,
 						22
 					],
@@ -4275,7 +5647,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						908,
-						955,
+						1105,
 						50,
 						20
 					],
@@ -4291,7 +5663,7 @@
 					"numoutlets": 1,
 					"patching_rect": [
 						860,
-						985,
+						1135,
 						45,
 						22
 					],
@@ -4309,7 +5681,7 @@
 					"numoutlets": 3,
 					"patching_rect": [
 						75,
-						1015,
+						1165,
 						200,
 						22
 					],
@@ -4329,7 +5701,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						285,
-						1015,
+						1165,
 						300,
 						20
 					],
@@ -4345,7 +5717,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						30,
-						960,
+						1110,
 						110,
 						20
 					],
@@ -4368,7 +5740,7 @@
 					"numoutlets": 3,
 					"patching_rect": [
 						75,
-						975,
+						1125,
 						45,
 						22
 					],
@@ -4388,7 +5760,7 @@
 					"numoutlets": 2,
 					"patching_rect": [
 						75,
-						1005,
+						1155,
 						60,
 						22
 					],
@@ -4407,7 +5779,7 @@
 					"numoutlets": 7,
 					"patching_rect": [
 						75,
-						1035,
+						1185,
 						160,
 						22
 					],
@@ -4431,7 +5803,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						255,
-						1035,
+						1185,
 						75,
 						22
 					],
@@ -4446,7 +5818,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						375,
-						1035,
+						1185,
 						75,
 						22
 					],
@@ -4461,7 +5833,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						495,
-						1035,
+						1185,
 						75,
 						22
 					],
@@ -4476,7 +5848,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						615,
-						1035,
+						1185,
 						75,
 						22
 					],
@@ -4491,7 +5863,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						735,
-						1035,
+						1185,
 						75,
 						22
 					],
@@ -4506,7 +5878,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						855,
-						1035,
+						1185,
 						75,
 						22
 					],
@@ -4629,7 +6001,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						1065,
+						1215,
 						420,
 						20
 					],
@@ -4644,7 +6016,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						1095,
+						1245,
 						400,
 						20
 					],
@@ -4659,7 +6031,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						1113,
+						1263,
 						400,
 						20
 					],
@@ -4674,7 +6046,7 @@
 					"numoutlets": 0,
 					"patching_rect": [
 						75,
-						1131,
+						1281,
 						450,
 						20
 					],
@@ -6474,6 +7846,1110 @@
 			{
 				"patchline": {
 					"source": [
+						"sq-js",
+						0
+					],
+					"destination": [
+						"fl-tp-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-tp-0",
+						0
+					],
+					"destination": [
+						"fl-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"sq-js",
+						1
+					],
+					"destination": [
+						"fl-tp-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-tp-1",
+						0
+					],
+					"destination": [
+						"fl-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"sq-js",
+						2
+					],
+					"destination": [
+						"fl-tp-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-tp-2",
+						0
+					],
+					"destination": [
+						"fl-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"sq-js",
+						3
+					],
+					"destination": [
+						"fl-tp-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-tp-3",
+						0
+					],
+					"destination": [
+						"fl-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"sq-js",
+						4
+					],
+					"destination": [
+						"fl-tp-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-tp-4",
+						0
+					],
+					"destination": [
+						"fl-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"sq-js",
+						5
+					],
+					"destination": [
+						"fl-tp-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-tp-5",
+						0
+					],
+					"destination": [
+						"fl-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-js",
+						0
+					],
+					"destination": [
+						"fl-snd-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-js",
+						1
+					],
+					"destination": [
+						"fl-snd-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-js",
+						2
+					],
+					"destination": [
+						"fl-snd-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-js",
+						3
+					],
+					"destination": [
+						"fl-snd-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-js",
+						4
+					],
+					"destination": [
+						"fl-snd-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-js",
+						5
+					],
+					"destination": [
+						"fl-snd-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-calc",
+						0
+					],
+					"destination": [
+						"fl-js",
+						2
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-0",
+						0
+					],
+					"destination": [
+						"fl-subdivision-p-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-0",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-0",
+						0
+					],
+					"destination": [
+						"fl-probability-p-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-0",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-0",
+						0
+					],
+					"destination": [
+						"fl-humanize-p-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-0",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-0",
+						0
+					],
+					"destination": [
+						"fl-burst-p-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-0",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-1",
+						0
+					],
+					"destination": [
+						"fl-subdivision-p-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-1",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-1",
+						0
+					],
+					"destination": [
+						"fl-probability-p-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-1",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-1",
+						0
+					],
+					"destination": [
+						"fl-humanize-p-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-1",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-1",
+						0
+					],
+					"destination": [
+						"fl-burst-p-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-1",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-2",
+						0
+					],
+					"destination": [
+						"fl-subdivision-p-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-2",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-2",
+						0
+					],
+					"destination": [
+						"fl-probability-p-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-2",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-2",
+						0
+					],
+					"destination": [
+						"fl-humanize-p-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-2",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-2",
+						0
+					],
+					"destination": [
+						"fl-burst-p-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-2",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-3",
+						0
+					],
+					"destination": [
+						"fl-subdivision-p-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-3",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-3",
+						0
+					],
+					"destination": [
+						"fl-probability-p-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-3",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-3",
+						0
+					],
+					"destination": [
+						"fl-humanize-p-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-3",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-3",
+						0
+					],
+					"destination": [
+						"fl-burst-p-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-3",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-4",
+						0
+					],
+					"destination": [
+						"fl-subdivision-p-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-4",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-4",
+						0
+					],
+					"destination": [
+						"fl-probability-p-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-4",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-4",
+						0
+					],
+					"destination": [
+						"fl-humanize-p-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-4",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-4",
+						0
+					],
+					"destination": [
+						"fl-burst-p-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-4",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-5",
+						0
+					],
+					"destination": [
+						"fl-subdivision-p-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-5",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-5",
+						0
+					],
+					"destination": [
+						"fl-probability-p-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-5",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-5",
+						0
+					],
+					"destination": [
+						"fl-humanize-p-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-5",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-5",
+						0
+					],
+					"destination": [
+						"fl-burst-p-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-5",
+						0
+					],
+					"destination": [
+						"fl-js",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-km-notify",
+						0
+					],
+					"destination": [
+						"km-js",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-0",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-0",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-0",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-0",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-1",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-1",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-1",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-1",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-2",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-2",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-2",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-2",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-3",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-3",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-3",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-3",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-4",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-4",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-4",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-4",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-subdivision-p-5",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-probability-p-5",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-humanize-p-5",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-burst-p-5",
+						0
+					],
+					"destination": [
+						"fl-km-notify",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"tr-lb",
 						0
 					],
@@ -6528,6 +9004,18 @@
 					"destination": [
 						"sq-js",
 						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"km-js",
+						4
+					],
+					"destination": [
+						"fl-js",
+						1
 					]
 				}
 			},

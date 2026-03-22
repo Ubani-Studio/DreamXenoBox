@@ -227,8 +227,9 @@ Y_SEQ_JS    = 285
 Y_VOICES    = 330
 Y_MIXER     = 510
 Y_EDITOR    = 660
-Y_KITS      = 870
-Y_MIDI      = 975
+Y_FLAM      = 870
+Y_KITS      = 1020
+Y_MIDI      = 1125
 
 # Grid dimensions
 GRID_X = 75
@@ -564,13 +565,96 @@ def build():
         wire(f"dd-{j}", 0, f"dp-{j}", 0)
         wire(f"dp-{j}", 0, "vc-js", 1)
 
+    # ═══════════════════════ FLAM ENGINE ═══════════════════════
+    section_header("sec-fl", 30, Y_FLAM - 15, "FLAM ENGINE")
+
+    # Flam engine JS (7 outlets: 0-5=voice bangs, 6=status)
+    box("fl-js", "newobj", 75, Y_FLAM, 750, 22,
+        "js flamengine.js", ni=3, no=7,
+        ot=["bang", "bang", "bang", "bang", "bang", "bang", ""])
+
+    # Tap sequencer outlets → prepend trig N → flam engine inlet 0
+    for i in range(6):
+        fx = VOICE_COLS[i]
+        box(f"fl-tp-{i}", "newobj", fx, Y_FLAM - 30, 95, 22,
+            f"prepend trig {i}", ot=[""])
+        wire("sq-js", i, f"fl-tp-{i}", 0)
+        wire(f"fl-tp-{i}", 0, "fl-js", 0)
+
+    # Flam engine outlets → voice click~ via send (reuse v{i}_trig)
+    for i in range(6):
+        fx = VOICE_COLS[i]
+        box(f"fl-snd-{i}", "newobj", fx, Y_FLAM + 30, 80, 22,
+            f"send v{i}_trig", ni=1, no=0)
+        wire("fl-js", i, f"fl-snd-{i}", 0)
+
+    # Transport tempo → flam engine inlet 2
+    wire("tr-calc", 0, "fl-js", 2)
+
+    # Per-voice flam controls (6 columns)
+    FLAM_PARAMS = ["subdivision", "probability", "humanize", "burst"]
+    FLAM_LABELS = ["SUBDIV", "PROB %", "HUMAN", "BURST"]
+
+    flam_ctrl_y = Y_FLAM + 60
+
+    for i in range(6):
+        fx = VOICE_COLS[i]
+        comment(f"fl-vl-{i}", fx, flam_ctrl_y, VOICES[i]["name"],
+                fontface=1, fontsize=10.0, w=55)
+
+        for j, (fparam, flabel) in enumerate(zip(FLAM_PARAMS, FLAM_LABELS)):
+            fy = flam_ctrl_y + 18 + j * 22
+            fw = 130
+
+            if fparam == "subdivision":
+                # umenu for subdivision
+                box(f"fl-{fparam}-{i}", "umenu", fx, fy, 75, 20,
+                    no=2, ot=["int", ""],
+                    items=["OFF", ",", "1/32", ",", "1/48", ",", "1/64", ",", "1/96"])
+                box(f"fl-{fparam}-p-{i}", "newobj", fx + 80, fy, fw, 22,
+                    f"prepend {fparam} {i}", ot=[""])
+                wire(f"fl-{fparam}-{i}", 0, f"fl-{fparam}-p-{i}", 0)
+                wire(f"fl-{fparam}-p-{i}", 0, "fl-js", 1)
+            elif fparam == "burst":
+                # number box for burst (1-8)
+                box(f"fl-{fparam}-{i}", "number", fx, fy, 40, 22,
+                    no=2, ot=["int", "bang"], minimum=1, maximum=8)
+                box(f"fl-{fparam}-p-{i}", "newobj", fx + 45, fy, fw, 22,
+                    f"prepend {fparam} {i}", ot=[""])
+                wire(f"fl-{fparam}-{i}", 0, f"fl-{fparam}-p-{i}", 0)
+                wire(f"fl-{fparam}-p-{i}", 0, "fl-js", 1)
+            else:
+                # dial for probability (0-100) and humanize (0-127 → 0-1)
+                box(f"fl-{fparam}-{i}", "dial", fx, fy, 30, 30,
+                    no=1, ot=["int"], parameter_enable=0)
+                box(f"fl-{fparam}-p-{i}", "newobj", fx + 35, fy + 4, fw, 22,
+                    f"prepend {fparam} {i}", ot=[""])
+                wire(f"fl-{fparam}-{i}", 0, f"fl-{fparam}-p-{i}", 0)
+                wire(f"fl-{fparam}-p-{i}", 0, "fl-js", 1)
+
+        # Column labels (only for first voice column)
+        if i == 0:
+            for j, flabel in enumerate(FLAM_LABELS):
+                fy = flam_ctrl_y + 18 + j * 22
+                comment(f"fl-lbl-{j}", 15, fy + 2, flabel,
+                        fontsize=9.0, w=55)
+
+    # Flam param notifications to kit manager (single prepend below controls)
+    box("fl-km-notify", "newobj", 75, flam_ctrl_y + 110, 140, 22,
+        "prepend flam_param", ot=[""])
+    wire("fl-km-notify", 0, "km-js", 0)
+    # All flam prepend outputs also go to kit manager via this
+    for i in range(6):
+        for fparam in FLAM_PARAMS:
+            wire(f"fl-{fparam}-p-{i}", 0, "fl-km-notify", 0)
+
     # ═══════════════════════ KIT MANAGER ═══════════════════════
     section_header("sec-km", 30, Y_KITS - 15, "KITS")
 
-    # Kit manager JS (4 outlets: params, patterns, lengths, status)
+    # Kit manager JS (5 outlets: params, patterns, lengths, status, flam)
     box("km-js", "newobj", 75, Y_KITS, 750, 22,
-        "js kitmanager.js", ni=1, no=4,
-        ot=["", "", "", ""])
+        "js kitmanager.js", ni=1, no=5,
+        ot=["", "", "", "", ""])
 
     # Init kit manager on load
     box("km-init", "message", 855, Y_KITS, 70, 22,
@@ -586,6 +670,9 @@ def build():
 
     # Kit manager outlet 2 → sequencer (length restore)
     wire("km-js", 2, "sq-js", 0)
+
+    # Kit manager outlet 4 → flam engine (flam restore)
+    wire("km-js", 4, "fl-js", 1)
 
     # Voicectrl outlet 7 → kit manager (param change notifications)
     wire("vc-js", 7, "km-js", 0)
@@ -688,7 +775,7 @@ def build():
             "appversion": {"major": 9, "minor": 0, "revision": 0,
                            "architecture": "x64", "modernui": 1},
             "classnamespace": "box",
-            "rect": [20, 40, 1160, 1180],
+            "rect": [20, 40, 1160, 1380],
             "bglocked": 0,
             "openinpresentation": 0,
             "default_fontsize": 12.0,

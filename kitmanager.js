@@ -4,9 +4,10 @@
 // outlet 1: pattern restore messages (col row value) → matrixctrl
 // outlet 2: length restore messages (setlength_idx voice idx) → sequencer
 // outlet 3: status/UI messages (kit_name, kit_names list)
+// outlet 4: flam restore messages → flamengine
 
 inlets = 1;
-outlets = 4;
+outlets = 5;
 
 var NUM_VOICES = 6;
 var MAX_STEPS = 32;
@@ -30,6 +31,10 @@ for (var i = 0; i < NUM_SLOTS; i++) {
 var cur_voices = [];
 var cur_patterns = [];
 var cur_lengths = [16, 16, 16, 16, 16, 16];
+var cur_flam = [];
+for (var _fi = 0; _fi < NUM_VOICES; _fi++) {
+	cur_flam[_fi] = {subdivision: 0, probability: 50, humanize: 0, burst: 1};
+}
 
 // Length index map (matches sequencer.js)
 var LEN_MAP = [4, 8, 12, 16, 24, 32];
@@ -82,7 +87,8 @@ function snapshot() {
 	var snap = {
 		voices: [],
 		patterns: [],
-		lengths: cur_lengths.slice()
+		lengths: cur_lengths.slice(),
+		flam: []
 	};
 	for (var i = 0; i < NUM_VOICES; i++) {
 		var v = {};
@@ -92,6 +98,12 @@ function snapshot() {
 		}
 		snap.voices.push(v);
 		snap.patterns.push(cur_patterns[i].slice());
+		snap.flam.push({
+			subdivision: cur_flam[i].subdivision,
+			probability: cur_flam[i].probability,
+			humanize: cur_flam[i].humanize,
+			burst: cur_flam[i].burst
+		});
 	}
 	return snap;
 }
@@ -119,6 +131,14 @@ function voice_length(voice, len_idx) {
 	len_idx = Math.floor(len_idx);
 	if (voice >= 0 && voice < NUM_VOICES && len_idx >= 0 && len_idx < LEN_MAP.length) {
 		cur_lengths[voice] = LEN_MAP[len_idx];
+	}
+}
+
+// Update current flam state (receives "flam_param <param> <voice> <value>")
+function flam_param(param, voice, value) {
+	voice = Math.floor(voice);
+	if (voice >= 0 && voice < NUM_VOICES && cur_flam[voice]) {
+		cur_flam[voice][param] = value;
 	}
 }
 
@@ -181,6 +201,20 @@ function load(slot) {
 		outlet(2, "setlength_idx", i3, idx);
 	}
 
+	// Restore flam params → outlet 4
+	if (kit.flam) {
+		for (var i4 = 0; i4 < NUM_VOICES; i4++) {
+			var fl = kit.flam[i4];
+			if (fl) {
+				outlet(4, "restore_voice", i4, fl.subdivision, fl.probability, fl.humanize, fl.burst);
+				cur_flam[i4].subdivision = fl.subdivision;
+				cur_flam[i4].probability = fl.probability;
+				cur_flam[i4].humanize = fl.humanize;
+				cur_flam[i4].burst = fl.burst;
+			}
+		}
+	}
+
 	outlet(3, "status", "Loaded " + kit_names[slot]);
 	// Tell voicectrl to refresh UI
 	outlet(0, "refresh_ui");
@@ -223,6 +257,9 @@ function anything() {
 		pattern_cell(args[0], args[1], args[2]);
 	} else if (msg === "voice_length") {
 		voice_length(args[0], args[1]);
+	} else if (msg === "flam_param") {
+		// args: param_name, voice_index, value
+		flam_param(args[0], args[1], args[2]);
 	} else if (msg === "getnames") {
 		getnames();
 	} else if (msg === "init_defaults") {
