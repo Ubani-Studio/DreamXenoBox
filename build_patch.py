@@ -172,6 +172,8 @@ VOICES = [
      "midi_note": 45, "pattern": [0,0,0,1, 0,0,0,0, 0,0,0,1, 0,0,0,0]},
 ]
 
+NUM_SLOTS = 8  # Kit slots
+
 MACROS = ["stress", "bloom", "scar", "weight", "mist", "heat_macro", "drift_param", "density_param"]
 MACRO_LABELS = ["STRESS", "BLOOM", "SCAR", "WEIGHT", "MIST", "HEAT", "DRIFT", "DENSITY"]
 
@@ -187,7 +189,8 @@ Y_SEQ_JS    = 285
 Y_VOICES    = 330
 Y_MIXER     = 510
 Y_EDITOR    = 660
-Y_MIDI      = 870
+Y_KITS      = 870
+Y_MIDI      = 975
 
 # Grid dimensions
 GRID_X = 75
@@ -467,10 +470,10 @@ def build():
             }
         })
 
-    # Voice controller JS
+    # Voice controller JS (8 outlets: 0-5=voices, 6=UI, 7=kit notify)
     box("vc-js", "newobj", 75, Y_EDITOR + 35, 750, 22,
-        "js voicectrl.js", ni=2, no=7,
-        ot=["", "", "", "", "", "", ""])
+        "js voicectrl.js", ni=2, no=8,
+        ot=["", "", "", "", "", "", "", ""])
     wire("vc-tab", 0, "vc-js", 0)
 
     # Init voice params on load
@@ -522,6 +525,78 @@ def build():
             f"prepend {pname}", ot=[""])
         wire(f"dd-{j}", 0, f"dp-{j}", 0)
         wire(f"dp-{j}", 0, "vc-js", 1)
+
+    # ═══════════════════════ KIT MANAGER ═══════════════════════
+    section_header("sec-km", 30, Y_KITS - 15, "KITS")
+
+    # Kit manager JS (4 outlets: params, patterns, lengths, status)
+    box("km-js", "newobj", 75, Y_KITS, 750, 22,
+        "js kitmanager.js", ni=1, no=4,
+        ot=["", "", "", ""])
+
+    # Init kit manager on load
+    box("km-init", "message", 855, Y_KITS, 70, 22,
+        "init_defaults", ni=2, ot=[""])
+    wire("tr-lb", 0, "km-init", 0)
+    wire("km-init", 0, "km-js", 0)
+
+    # Kit manager outlet 0 → voicectrl (restore messages)
+    wire("km-js", 0, "vc-js", 0)
+
+    # Kit manager outlet 1 → matrixctrl (pattern restore)
+    wire("km-js", 1, "sq-grid", 0)
+
+    # Kit manager outlet 2 → sequencer (length restore)
+    wire("km-js", 2, "sq-js", 0)
+
+    # Voicectrl outlet 7 → kit manager (param change notifications)
+    wire("vc-js", 7, "km-js", 0)
+
+    # matrixctrl → kit manager (pattern change notifications)
+    box("km-pcell", "newobj", 75, Y_KITS + 30, 120, 22,
+        "prepend pattern_cell", ot=[""])
+    wire("sq-grid", 0, "km-pcell", 0)
+    wire("km-pcell", 0, "km-js", 0)
+
+    # Length changes → kit manager
+    for i in range(6):
+        box(f"km-len-{i}", "newobj", 75 + i * 120, Y_KITS + 55, 130, 22,
+            f"prepend voice_length {i}", ot=[""])
+        wire(f"len-{i}", 0, f"km-len-{i}", 0)
+        wire(f"km-len-{i}", 0, "km-js", 0)
+
+    # 8 kit slot buttons: SAVE row + LOAD row
+    kit_x = 75
+    kit_btn_w = 80
+    kit_btn_spacing = 105
+
+    comment("km-sv-lbl", kit_x, Y_KITS + 85, "SAVE:", fontface=1, w=45)
+    comment("km-ld-lbl", kit_x, Y_KITS + 115, "LOAD:", fontface=1, w=45)
+
+    for k in range(NUM_SLOTS):
+        kx = kit_x + 50 + k * kit_btn_spacing
+
+        # Save button
+        box(f"km-sv-{k}", "message", kx, Y_KITS + 85, 45, 22,
+            f"save {k}", ni=2, ot=[""])
+        wire(f"km-sv-{k}", 0, "km-js", 0)
+
+        # Kit name label (updated by kit manager outlet 3)
+        box(f"km-nm-{k}", "comment", kx + 48, Y_KITS + 85, 50, 20,
+            f"---", no=0, fontsize=10.0)
+
+        # Load button
+        box(f"km-ld-{k}", "message", kx, Y_KITS + 115, 45, 22,
+            f"load {k}", ni=2, ot=[""])
+        wire(f"km-ld-{k}", 0, "km-js", 0)
+
+    # Status display (kit manager outlet 3)
+    box("km-status-route", "newobj", 75, Y_KITS + 145, 200, 22,
+        "route status kit_name", ni=1, no=3, ot=["", "", ""])
+    wire("km-js", 3, "km-status-route", 0)
+
+    # Status text display
+    comment("km-status", 285, Y_KITS + 145, "", w=300, fontsize=11.0)
 
     # ═══════════════════════ MIDI INPUT ═══════════════════════
     section_header("sec-mi", 30, Y_MIDI - 15, "MIDI INPUT")
@@ -575,7 +650,7 @@ def build():
             "appversion": {"major": 9, "minor": 0, "revision": 0,
                            "architecture": "x64", "modernui": 1},
             "classnamespace": "box",
-            "rect": [20, 40, 1160, 1060],
+            "rect": [20, 40, 1160, 1180],
             "bglocked": 0,
             "openinpresentation": 0,
             "default_fontsize": 12.0,

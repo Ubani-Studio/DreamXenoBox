@@ -1,11 +1,12 @@
 // DREAM XENO BOX — Voice Parameter Controller
-// inlet 0: voice selection (int 0-5) or "init" message
+// inlet 0: voice selection (int 0-5), "init", "restore", "refresh_ui"
 // inlet 1: param changes from UI (message name = param, arg = value)
 // outlets 0-5: param messages to gen~ voice 0-5
 // outlet 6: UI update messages when voice changes (param_name scaled_value)
+// outlet 7: kit manager notifications (voice_param voice param value)
 
 inlets = 2;
-outlets = 7;
+outlets = 8;
 
 var PARAM_NAMES = [
 	"pitch", "decay_ms", "exciter_type", "body_type",
@@ -71,11 +72,37 @@ function init() {
 	updateUI();
 }
 
+// Restore a single voice param from kit manager
+function restore(voice_idx, param, value) {
+	voice_idx = Math.floor(voice_idx);
+	if (voice_idx >= 0 && voice_idx < 6 && RANGES[param] !== undefined) {
+		voices[voice_idx][param] = value;
+		outlet(voice_idx, param, value);
+	}
+}
+
+// Refresh UI dials after kit load
+function refresh_ui() {
+	updateUI();
+}
+
 // Param change from UI dial (arrives as e.g. "stress 64" where 64 is 0-127)
 function anything() {
+	var msg = messagename;
+	var args = arrayfromargs(arguments);
+
+	if (inlet === 0) {
+		if (msg === "restore") {
+			restore(args[0], args[1], args[2]);
+		} else if (msg === "refresh_ui") {
+			refresh_ui();
+		}
+		return;
+	}
+
 	if (inlet === 1) {
-		var param = messagename;
-		var raw = arrayfromargs(arguments)[0];
+		var param = msg;
+		var raw = args[0];
 		if (RANGES[param] !== undefined) {
 			var r = RANGES[param];
 			var val;
@@ -87,6 +114,8 @@ function anything() {
 			}
 			voices[selected][param] = val;
 			outlet(selected, param, val);
+			// Notify kit manager of change
+			outlet(7, "voice_param", selected, param, val);
 		}
 	}
 }
