@@ -430,11 +430,21 @@ def build():
     # ═══════════════════════ VOICE EDITOR ═══════════════════════
     section_header("sec-ed", 30, Y_EDITOR - 15, "VOICE EDITOR")
 
-    # Voice select tab
-    box("vc-tab", "tab", 75, Y_EDITOR, 750, 28, ni=1, no=3,
-        ot=["int", "", ""],
-        parameter_enable=0, fontface=1, fontsize=12.0,
-        tabs=["MASS", "VEIN", "SHARD", "HUSK", "FAULT", "HALO"])
+    # Voice select tab (live.tab for reliable JSON tab labels)
+    box("vc-tab", "live.tab", 75, Y_EDITOR, 750, 28, ni=1, no=3,
+        ot=["", "", "float"],
+        parameter_enable=1,
+        num_lines_patching=1, num_lines_presentation=1,
+        saved_attribute_attributes={
+            "valueof": {
+                "parameter_enum": ["MASS", "VEIN", "SHARD", "HUSK", "FAULT", "HALO"],
+                "parameter_longname": "voice_select",
+                "parameter_shortname": "voice",
+                "parameter_mmax": 5.0,
+                "parameter_type": 2,
+                "parameter_unitstyle": 0
+            }
+        })
 
     # Voice controller JS
     box("vc-js", "newobj", 75, Y_EDITOR + 35, 750, 22,

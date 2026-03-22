@@ -2626,7 +2626,7 @@
 			{
 				"box": {
 					"id": "vc-tab",
-					"maxclass": "tab",
+					"maxclass": "live.tab",
 					"numinlets": 1,
 					"numoutlets": 3,
 					"patching_rect": [
@@ -2636,21 +2636,30 @@
 						28
 					],
 					"outlettype": [
-						"int",
 						"",
-						""
+						"",
+						"float"
 					],
-					"parameter_enable": 0,
-					"fontface": 1,
-					"fontsize": 12.0,
-					"tabs": [
-						"MASS",
-						"VEIN",
-						"SHARD",
-						"HUSK",
-						"FAULT",
-						"HALO"
-					]
+					"parameter_enable": 1,
+					"num_lines_patching": 1,
+					"num_lines_presentation": 1,
+					"saved_attribute_attributes": {
+						"valueof": {
+							"parameter_enum": [
+								"MASS",
+								"VEIN",
+								"SHARD",
+								"HUSK",
+								"FAULT",
+								"HALO"
+							],
+							"parameter_longname": "voice_select",
+							"parameter_shortname": "voice",
+							"parameter_mmax": 5.0,
+							"parameter_type": 2,
+							"parameter_unitstyle": 0
+						}
+					}
 				}
 			},
 			{
