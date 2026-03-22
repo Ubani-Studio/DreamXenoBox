@@ -38,6 +38,9 @@ History ry2_d(0);
 History comb_lp(0);
 History halo_env(0);
 History main_env(0);
+History pitch_env(0);
+History fb_state(0);
+History fb_hp(0);
 Delay comb_d(8820);
 
 trig_on = (in1 > 0.5) * (prev_trig <= 0.5);
@@ -50,6 +53,7 @@ if (trig_on) {
     exc_env = 1;
     halo_env = vel * mist;
     main_env = vel;
+    pitch_env = vel;
 }
 
 p_decay = 0.00002 + (1 - stress) * 0.00008;
@@ -61,7 +65,11 @@ stiffness = fatigue * 0.6 + pressure * 0.4;
 
 eff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);
 eff_scar = clamp(scar + pressure * stress, 0, 1);
-p_mod = pitch + noise() * pressure * drift_param * 2;
+
+p_env_rate = 0.002 + weight * 0.008;
+pitch_env = pitch_env * (1 - p_env_rate);
+p_sweep = pitch_env * weight * 24;
+p_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;
 base_freq = mtof(clamp(p_mod, 10, 130));
 w_scale = 1 - weight * 0.8;
 body_freq = base_freq * w_scale;
@@ -86,25 +94,39 @@ if (exciter_type < 0.5) {
     exciter_out = noise_filt * 4 * exc_env;
 }
 
-body_out = 0;
-eff_Q = clamp(0.995 - fatigue * 0.3, 0.8, 0.999);
+fb_gain = mist * (0.5 + stress * 0.5);
+fb_gain = clamp(fb_gain, 0, 0.95);
+hp_cut = 200 + (1 - weight) * 800;
+hp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);
+fb_lp = fb_hp + (fb_state - fb_hp) * hp_c;
+fb_hp = fb_lp;
+fb_hpf = fb_state - fb_lp;
+fb_ltd = tanh(fb_hpf * 2) * 0.5;
+bl_rate = 0.000005 + (1 - bloom) * 0.0003;
+halo_env = halo_env * (1 - bl_rate);
+fb_sig = fb_ltd * fb_gain * halo_env;
+body_input = exciter_out + fb_sig;
 
+decay_norm = clamp(decay_ms / 4000, 0, 1);
+eff_Q = clamp(0.98 + decay_norm * 0.015 - fatigue * 0.3, 0.8, 0.9995);
+
+body_out = 0;
 if (body_type < 0.5) {
     w1 = twopi * body_freq * 1.0 / samplerate;
     r1 = eff_Q;
-    ya = exciter_out + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
+    ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
     ry2_a = ry1_a; ry1_a = ya;
     w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;
     r2 = eff_Q * 0.99;
-    yb = exciter_out + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;
+    yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;
     ry2_b = ry1_b; ry1_b = yb;
     w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;
     r3 = eff_Q * 0.98;
-    yc = exciter_out + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;
+    yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;
     ry2_c = ry1_c; ry1_c = yc;
     w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;
     r4 = eff_Q * 0.97;
-    yd = exciter_out + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
+    yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
     ry2_d = ry1_d; ry1_d = yd;
     body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;
 } else {
@@ -113,7 +135,7 @@ if (body_type < 0.5) {
     delayed = comb_d.read(d_samps);
     d_coeff = 0.3 + fatigue * 0.4;
     comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;
-    comb_d.write(exciter_out + comb_lp * fb);
+    comb_d.write(body_input + comb_lp * fb);
     body_out = delayed;
 }
 
@@ -125,19 +147,18 @@ if (eff_scar > 0.01) {
     fractured = body_out * (1 - eff_scar) + folded * eff_scar;
 }
 
-bl_decay = 0.0001 + bloom * 0.001;
-halo_env = halo_env * (1 - bl_decay);
-h_out = noise() * halo_env * clamp(body_freq * 2 / samplerate, 0.01, 0.49) * 4;
+fb_source = body_out * (1 - stress) + fractured * stress;
+fb_state = fb_source;
 
 env_rate = 1.0 / max(decay_ms * samplerate / 1000, 1);
 main_env = main_env * (1 - env_rate);
 
-mixed = fractured * (1 - mist * 0.5) + h_out;
-out1 = mixed * main_env;""".strip()
+out_env = max(main_env, halo_env * mist);
+out1 = fractured * out_env;""".strip()
 
 # ── Voice definitions ──
 VOICES = [
-    {"name": "MASS",  "idx": 0, "color": [0.9, 0.2, 0.2, 1.0], "level": 0.4,
+    {"name": "MASS",  "idx": 0, "color": [0.9, 0.2, 0.2, 1.0], "level": 0.5,
      "midi_note": 36, "pattern": [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0]},
     {"name": "VEIN",  "idx": 1, "color": [0.8, 0.5, 0.1, 1.0], "level": 0.3,
      "midi_note": 38, "pattern": [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]},

@@ -16,7 +16,7 @@ var PARAM_NAMES = [
 // Min/max for dial scaling (dials send 0-127, we scale to real range)
 var RANGES = {
 	pitch:        [10, 130],
-	decay_ms:     [10, 2000],
+	decay_ms:     [10, 4000],
 	exciter_type: [0, 1],
 	body_type:    [0, 1],
 	stress:       [0, 1],
@@ -30,9 +30,9 @@ var RANGES = {
 };
 
 var voices = [
-	{pitch:36, decay_ms:300, exciter_type:0, body_type:1,
-	 stress:0.3, bloom:0.3, scar:0.2, weight:0.9,
-	 mist:0.1, heat_macro:0.3, drift_param:0.1, density_param:0.5},
+	{pitch:30, decay_ms:1200, exciter_type:0, body_type:1,
+	 stress:0.1, bloom:0.1, scar:0.05, weight:0.95,
+	 mist:0.0, heat_macro:0.3, drift_param:0.05, density_param:0.5},
 	{pitch:62, decay_ms:120, exciter_type:0, body_type:0,
 	 stress:0.4, bloom:0.2, scar:0.4, weight:0.4,
 	 mist:0.15, heat_macro:0.5, drift_param:0.05, density_param:0.5},
@@ -45,9 +45,9 @@ var voices = [
 	{pitch:40, decay_ms:400, exciter_type:0, body_type:1,
 	 stress:0.7, bloom:0.4, scar:0.7, weight:0.8,
 	 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5},
-	{pitch:72, decay_ms:500, exciter_type:1, body_type:0,
-	 stress:0.2, bloom:0.7, scar:0.1, weight:0.2,
-	 mist:0.8, heat_macro:0.3, drift_param:0.05, density_param:0.3}
+	{pitch:72, decay_ms:800, exciter_type:1, body_type:0,
+	 stress:0.6, bloom:0.85, scar:0.4, weight:0.2,
+	 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4}
 ];
 
 var selected = 0;
