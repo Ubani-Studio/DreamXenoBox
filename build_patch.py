@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Generate DreamXenoBox.maxpat — 6-voice polymetric sequencer groovebox."""
+"""Generate DreamXenoBox.maxpat — 6-voice polymetric sequencer groovebox.
+
+Layout: 15px grid, top-to-bottom flow, send/receive for cross-section routing.
+"""
 import json
 
 # ── Voice engine codebox (no comments) ──
@@ -151,26 +154,45 @@ VOICES = [
 MACROS = ["stress", "bloom", "scar", "weight", "mist", "heat_macro", "drift_param", "density_param"]
 MACRO_LABELS = ["STRESS", "BLOOM", "SCAR", "WEIGHT", "MIST", "HEAT", "DRIFT", "DENSITY"]
 
-# Layout constants
-GRID_X = 70
-GRID_Y = 120
-GRID_W = 800
-GRID_H = 144  # 6 rows × 24px each
+# ── Layout constants (all multiples of 15) ──
+COL_SPACING = 150
+VOICE_COLS = [75 + i * COL_SPACING for i in range(6)]  # 75, 225, 375, 525, 675, 825
+
+# Section Y positions
+Y_TITLE     = 15
+Y_TRANSPORT = 45
+Y_SEQ       = 120
+Y_SEQ_JS    = 285
+Y_VOICES    = 330
+Y_MIXER     = 510
+Y_EDITOR    = 660
+Y_MIDI      = 870
+
+# Grid dimensions
+GRID_X = 75
+GRID_W = 780
+GRID_H = 144
 GRID_COLS = 32
 GRID_ROWS = 6
 
+
 def gen_patcher():
+    """gen~ sub-patcher with codebox voice engine."""
     return {
         "fileversion": 1,
-        "appversion": {"major": 9, "minor": 0, "revision": 0, "architecture": "x64", "modernui": 1},
+        "appversion": {"major": 9, "minor": 0, "revision": 0,
+                       "architecture": "x64", "modernui": 1},
         "rect": [0, 0, 800, 600],
         "editing_bgcolor": [0.65, 0.65, 0.65, 1.0],
         "boxes": [
-            {"box": {"id": "g-in", "maxclass": "newobj", "numinlets": 1, "numoutlets": 1,
-                     "outlettype": [""], "patching_rect": [50, 14, 30, 22], "text": "in 1"}},
-            {"box": {"id": "g-cb", "maxclass": "codebox", "numinlets": 1, "numoutlets": 1,
-                     "outlettype": [""], "patching_rect": [50, 50, 700, 450], "code": VOICE_CODE}},
-            {"box": {"id": "g-out", "maxclass": "newobj", "numinlets": 1, "numoutlets": 0,
+            {"box": {"id": "g-in", "maxclass": "newobj", "numinlets": 1,
+                     "numoutlets": 1, "outlettype": [""],
+                     "patching_rect": [50, 14, 30, 22], "text": "in 1"}},
+            {"box": {"id": "g-cb", "maxclass": "codebox", "numinlets": 1,
+                     "numoutlets": 1, "outlettype": [""],
+                     "patching_rect": [50, 50, 700, 450], "code": VOICE_CODE}},
+            {"box": {"id": "g-out", "maxclass": "newobj", "numinlets": 1,
+                     "numoutlets": 0,
                      "patching_rect": [50, 520, 35, 22], "text": "out 1"}}
         ],
         "lines": [
@@ -179,44 +201,74 @@ def gen_patcher():
         ]
     }
 
-# Helpers
+
+# ── Patch builder helpers ──
 _boxes = []
 _lines = []
 
+
 def box(bid, cls, x, y, w, h, text=None, **kw):
+    """Add a box to the patch. x,y should be multiples of 15."""
     b = {"id": bid, "maxclass": cls,
          "numinlets": kw.pop("ni", 1), "numoutlets": kw.pop("no", 1),
          "patching_rect": [x, y, w, h]}
-    if "ot" in kw: b["outlettype"] = kw.pop("ot")
-    if text is not None: b["text"] = text
+    if "ot" in kw:
+        b["outlettype"] = kw.pop("ot")
+    if text is not None:
+        b["text"] = text
     b.update(kw)
     _boxes.append({"box": b})
+
 
 def wire(src, so, dst, di):
     _lines.append({"patchline": {"source": [src, so], "destination": [dst, di]}})
 
+
 def comment(bid, x, y, text, **kw):
-    box(bid, "comment", x, y, kw.pop("w", len(text)*7+10), 20, text, no=0, **kw)
+    box(bid, "comment", x, y, kw.pop("w", len(text) * 7 + 10), 20,
+        text, no=0, **kw)
+
+
+def section_header(bid, x, y, text):
+    """Bold section separator comment."""
+    comment(bid, x, y, text, fontface=1, fontsize=14.0,
+            w=len(text) * 9 + 20,
+            textcolor=[0.3, 0.3, 0.3, 1.0])
+
+
+# ════════════════════════════════════════════════════════════════════
+# BUILD
+# ════════════════════════════════════════════════════════════════════
 
 def build():
     _boxes.clear()
     _lines.clear()
 
     # ═══════════════════════ TITLE ═══════════════════════
-    comment("title", 30, 10, "DREAM XENO BOX", w=600, fontsize=16.0, fontface=1)
+    comment("title", 30, Y_TITLE, "DREAM XENO BOX",
+            w=300, fontsize=18.0, fontface=1)
 
     # ═══════════════════════ TRANSPORT ═══════════════════════
-    box("tr-lb", "newobj", 30, 42, 58, 22, "loadbang", ot=["bang"])
-    box("tr-bpmi", "message", 100, 42, 32, 22, "120", ni=2, ot=[""])
-    comment("tr-bl", 145, 42, "BPM")
-    box("tr-bpm", "number", 175, 42, 50, 22, no=2, ot=["", "bang"], minimum=30, maximum=300)
-    box("tr-calc", "newobj", 240, 42, 135, 22, "expr 60000. / ($f1 * 4.)", ot=[""])
-    comment("tr-pl", 400, 42, "PLAY")
-    box("tr-play", "toggle", 440, 38, 30, 30, ot=["int"])
-    box("tr-metro", "newobj", 440, 76, 65, 22, "metro 125", ot=["bang"])
-    box("tr-cnt", "newobj", 440, 100, 100, 22, "counter 0 255", no=4, ot=["int","","","int"])
-    comment("tr-sl", 555, 100, "STEP")
-    box("tr-sn", "number", 590, 100, 45, 22, no=2, ot=["", "bang"])
+    section_header("sec-tr", 30, Y_TRANSPORT, "TRANSPORT")
+
+    ty = Y_TRANSPORT + 30  # 75
+
+    box("tr-lb", "newobj", 30, ty, 58, 22, "loadbang", ot=["bang"])
+    box("tr-bpmi", "message", 105, ty, 32, 22, "120", ni=2, ot=[""])
+    box("tr-bpm", "number", 150, ty, 50, 22, no=2, ot=["", "bang"],
+        minimum=30, maximum=300)
+    comment("tr-bl", 210, ty, "BPM", w=30)
+    box("tr-calc", "newobj", 255, ty, 135, 22,
+        "expr 60000. / ($f1 * 4.)", ot=[""])
+
+    # Play toggle + metro + counter
+    box("tr-play", "toggle", 435, ty - 4, 28, 28, ot=["int"])
+    comment("tr-pl", 470, ty, "PLAY", fontface=1, w=40)
+    box("tr-metro", "newobj", 435, ty + 30, 65, 22, "metro 125", ot=["bang"])
+    box("tr-cnt", "newobj", 435, ty + 60, 110, 22, "counter 0 255",
+        no=4, ot=["int", "", "", "int"])
+    comment("tr-sl", 570, ty + 60, "STEP", w=40)
+    box("tr-sn", "number", 615, ty + 60, 45, 22, no=2, ot=["", "bang"])
 
     wire("tr-lb", 0, "tr-bpmi", 0)
     wire("tr-bpmi", 0, "tr-bpm", 0)
@@ -227,40 +279,46 @@ def build():
     wire("tr-cnt", 0, "tr-sn", 0)
 
     # ═══════════════════════ SEQUENCER ═══════════════════════
+    section_header("sec-sq", 30, Y_SEQ - 15, "SEQUENCER")
 
     # Voice row labels (left of grid)
     for i, v in enumerate(VOICES):
-        row_y = GRID_Y + i * (GRID_H // GRID_ROWS) + 2
-        comment(f"rl-{i}", 10, row_y, v["name"], fontface=1, fontsize=11.0, w=55)
+        row_y = Y_SEQ + i * (GRID_H // GRID_ROWS) + 2
+        comment(f"rl-{i}", 15, row_y, v["name"], fontface=1, fontsize=11.0, w=55)
 
     # matrixctrl grid
-    box("sq-grid", "matrixctrl", GRID_X, GRID_Y, GRID_W, GRID_H,
+    box("sq-grid", "matrixctrl", GRID_X, Y_SEQ, GRID_W, GRID_H,
         ni=1, no=2, ot=["list", ""],
         parameter_enable=0, columns=GRID_COLS, rows=GRID_ROWS)
 
     # Length umenus (right of grid)
-    len_x = GRID_X + GRID_W + 15
-    comment("len-title", len_x, GRID_Y - 18, "LENGTH", fontface=1, w=55)
-    for i, v in enumerate(VOICES):
-        row_y = GRID_Y + i * (GRID_H // GRID_ROWS)
+    len_x = GRID_X + GRID_W + 15  # 870
+    comment("len-title", len_x, Y_SEQ - 15, "LENGTH", fontface=1, w=55)
+    for i in range(6):
+        row_y = Y_SEQ + i * (GRID_H // GRID_ROWS)
         uid = f"len-{i}"
         box(uid, "umenu", len_x, row_y, 55, 20, no=2, ot=["int", ""],
             items=["4", ",", "8", ",", "12", ",", "16", ",", "24", ",", "32"])
-        # Prepend voice index for JS
-        box(f"lp-{i}", "newobj", len_x + 60, row_y, 115, 22,
+        # Prepend voice index → send to JS
+        box(f"lp-{i}", "newobj", len_x + 60, row_y, 120, 22,
             f"prepend setlength_idx {i}", ot=[""])
         wire(uid, 0, f"lp-{i}", 0)
-        wire(f"lp-{i}", 0, "sq-js", 0)  # will create sq-js below
+        wire(f"lp-{i}", 0, "sq-js", 0)
         # Default to 16 steps (index 3)
-        box(f"li-{i}", "message", len_x + 60, row_y + 20, 22, 18, "3", ni=2, ot=[""])
+        box(f"li-{i}", "message", len_x + 60, row_y + 22, 22, 18,
+            "3", ni=2, ot=[""])
         wire("tr-lb", 0, f"li-{i}", 0)
         wire(f"li-{i}", 0, uid, 0)
 
-    # Sequencer JS
-    box("sq-js", "newobj", GRID_X, GRID_Y + GRID_H + 10, 240, 22,
-        "js sequencer.js", ni=2, no=7, ot=["","","","","","",""])
-    wire("tr-cnt", 0, "sq-js", 0)      # step → JS inlet 0
-    wire("sq-grid", 0, "sq-js", 1)     # matrixctrl → JS inlet 1
+    # Sequencer JS — width so outlets 0-5 align with voice columns
+    # For 7 outlets on width W: outlet[i] at x + i * W / 6
+    # We want outlet[i] center at VOICE_COLS[i] = 75 + i*150
+    # JS x = 75, so outlet[i] at 75 + i * W/6 = 75 + i*150 → W/6 = 150 → W = 900
+    js_w = 900
+    box("sq-js", "newobj", GRID_X, Y_SEQ_JS, js_w, 22,
+        "js sequencer.js", ni=2, no=7, ot=["", "", "", "", "", "", ""])
+    wire("tr-cnt", 0, "sq-js", 0)
+    wire("sq-grid", 0, "sq-js", 1)
 
     # Init matrixctrl with default patterns
     init_parts = []
@@ -268,155 +326,225 @@ def build():
         for step, val in enumerate(v["pattern"]):
             if val > 0:
                 init_parts.append(f"set {step} {i} 1")
-    box("sq-init", "message", GRID_X + 250, GRID_Y + GRID_H + 10, 400, 22,
+    box("sq-init", "message", GRID_X, Y_SEQ_JS + 30, 700, 22,
         ", ".join(init_parts), ni=2, ot=[""])
     wire("tr-lb", 0, "sq-init", 0)
     wire("sq-init", 0, "sq-grid", 0)
 
-    # ═══════════════════════ VOICES (audio) ═══════════════════════
-    voice_y = GRID_Y + GRID_H + 45
+    # ═══════════════════════ VOICES (audio chain) ═══════════════════════
+    section_header("sec-vc", 30, Y_VOICES - 15, "VOICES")
 
     for i, v in enumerate(VOICES):
-        vx = 30 + i * 160
-        # Click~ + gen~ + level
-        box(f"vc-{i}", "newobj", vx, voice_y, 42, 22, "click~", ot=["signal"])
-        box(f"vg-{i}", "newobj", vx, voice_y + 28, 150, 22, "gen~",
-            ot=["signal"], patcher=gen_patcher())
-        box(f"vl-{i}", "newobj", vx, voice_y + 58, 55, 22, f"*~ {v['level']}",
-            ni=2, ot=["signal"])
-        # Manual trigger button
-        box(f"vb-{i}", "button", vx + 55, voice_y - 5, 22, 22, ot=["bang"])
+        cx = VOICE_COLS[i]
 
-        # Wiring: JS → click~ → gen~ → level
+        # Voice name label
+        comment(f"vn-{i}", cx, Y_VOICES, v["name"], fontface=1,
+                fontsize=11.0, w=60)
+
+        # Manual trigger button (beside click~)
+        box(f"vb-{i}", "button", cx + 60, Y_VOICES + 22, 22, 22, ot=["bang"])
+
+        # click~ (trigger → impulse)
+        box(f"vc-{i}", "newobj", cx, Y_VOICES + 22, 42, 22,
+            "click~", ot=["signal"])
+
+        # receive for params from voice editor (message domain)
+        box(f"vr-{i}", "newobj", cx, Y_VOICES + 52, 90, 22,
+            f"receive v{i}_p", ot=[""])
+
+        # gen~ voice engine
+        box(f"vg-{i}", "newobj", cx, Y_VOICES + 82, 130, 22,
+            "gen~", ot=["signal"], patcher=gen_patcher())
+
+        # *~ level
+        box(f"vl-{i}", "newobj", cx, Y_VOICES + 112, 55, 22,
+            f"*~ {v['level']}", ni=2, ot=["signal"])
+
+        # send~ audio to mixer
+        box(f"vs-{i}", "newobj", cx, Y_VOICES + 142, 80, 22,
+            f"send~ v{i}_out", ni=1, no=0)
+
+        # Wiring: JS outlet → click~ → gen~ → *~ → send~
         wire("sq-js", i, f"vc-{i}", 0)
         wire(f"vb-{i}", 0, f"vc-{i}", 0)
         wire(f"vc-{i}", 0, f"vg-{i}", 0)
+        wire(f"vr-{i}", 0, f"vg-{i}", 0)   # params → gen~
         wire(f"vg-{i}", 0, f"vl-{i}", 0)
-
-    # ═══════════════════════ VOICE CTRL (tabbed param editor) ═══════════════════════
-    ed_y = voice_y + 95
-
-    # Voice select tab (6 tabs, one per voice)
-    box("vc-tab", "tab", 30, ed_y, 580, 28, ni=1, no=3, ot=["int", "", ""],
-        parameter_enable=0, fontface=1, fontsize=12.0,
-        tabs=["MASS", "VEIN", "SHARD", "HUSK", "FAULT", "HALO"])
-
-    # Voice controller JS
-    box("vc-js", "newobj", 550, ed_y, 220, 22,
-        "js voicectrl.js", ni=2, no=7, ot=["","","","","","",""])
-    wire("vc-tab", 0, "vc-js", 0)
-
-    # Init voice params on load
-    box("vc-initmsg", "message", 550, ed_y - 22, 35, 22, "init", ni=2, ot=[""])
-    wire("tr-lb", 0, "vc-initmsg", 0)
-    wire("vc-initmsg", 0, "vc-js", 0)
-
-    # Route voicectrl outlets to gen~ instances
-    for i in range(6):
-        wire("vc-js", i, f"vg-{i}", 0)
-
-    # UI update route (outlet 6 → route → set dials)
-    macro_route = "route " + " ".join(MACROS) + " pitch decay_ms exciter_type body_type"
-    box("vc-route", "newobj", 30, ed_y + 32, 650, 22, macro_route,
-        ni=1, no=13, ot=[""] * 13)
-    wire("vc-js", 6, "vc-route", 0)
-
-    # 8 macro dials + pitch/decay/exciter/body
-    dial_y = ed_y + 62
-    all_params = MACROS + ["pitch", "decay_ms", "exciter_type", "body_type"]
-    all_labels = MACRO_LABELS + ["PITCH", "DECAY", "EXC TYPE", "BODY TYPE"]
-
-    for j, (pname, plabel) in enumerate(zip(all_params, all_labels)):
-        dx = 30 + j * 82
-        # Label
-        comment(f"dl-{j}", dx, dial_y, plabel, fontsize=10.0, w=70)
-        # Dial
-        box(f"dd-{j}", "dial", dx + 5, dial_y + 18, 40, 40, no=1, ot=["int"],
-            parameter_enable=0)
-        # Set message (for UI update from voicectrl)
-        box(f"ds-{j}", "message", dx + 5, dial_y + 62, 55, 22, "set $1", ni=2, ot=[""])
-        wire("vc-route", j, f"ds-{j}", 0)
-        wire(f"ds-{j}", 0, f"dd-{j}", 0)
-        # Prepend param name (for dial → voicectrl)
-        box(f"dp-{j}", "newobj", dx + 5, dial_y + 88, 80, 22,
-            f"prepend {pname}", ot=[""])
-        wire(f"dd-{j}", 0, f"dp-{j}", 0)
-        wire(f"dp-{j}", 0, "vc-js", 1)
-
-    # ═══════════════════════ MIDI INPUT ═══════════════════════
-    midi_y = dial_y + 118
-
-    comment("midi-lbl", 30, midi_y, "MIDI IN", fontface=1, w=60)
-    box("midi-in", "newobj", 100, midi_y, 45, 22, "notein", no=3, ot=["int","int","int"])
-    box("midi-strip", "newobj", 100, midi_y + 25, 60, 22, "stripnote", ni=2, no=2, ot=["int","int"])
-
-    # Route MIDI notes to voices (C2=36, D2=38, E2=40, F2=41, G2=43, A2=45)
-    note_nums = " ".join(str(v["midi_note"]) for v in VOICES)
-    box("midi-sel", "newobj", 100, midi_y + 50, 160, 22, f"select {note_nums}",
-        ni=1, no=7, ot=["bang"] * 6 + [""])
-    wire("midi-in", 0, "midi-strip", 0)
-    wire("midi-in", 1, "midi-strip", 1)
-    wire("midi-strip", 0, "midi-sel", 0)
-    for i in range(6):
-        wire("midi-sel", i, f"vc-{i}", 0)
-
-    comment("midi-hint", 280, midi_y + 50, "Notes: C2=Mass D2=Vein E2=Shard F2=Husk G2=Fault A2=Halo", w=400)
+        wire(f"vl-{i}", 0, f"vs-{i}", 0)
 
     # ═══════════════════════ MIXER ═══════════════════════
-    mix_y = midi_y + 82
+    section_header("sec-mx", 30, Y_MIXER - 15, "MIXER")
 
+    # receive~ from each voice
+    for i in range(6):
+        rx = 75 + i * 120
+        box(f"mr-{i}", "newobj", rx, Y_MIXER, 95, 22,
+            f"receive~ v{i}_out", ot=["signal"])
+
+    # +~ cascade: (v0+v1) → +v2 → +v3 → +v4 → +v5
+    add_y = Y_MIXER + 30
     for s in range(5):
-        box(f"mx-{s}", "newobj", 30 + s * 70, mix_y, 35, 22, "+~", ni=2, ot=["signal"])
+        ax = 75 + s * 120
+        box(f"mx-{s}", "newobj", ax, add_y, 35, 22, "+~",
+            ni=2, ot=["signal"])
 
-    wire("vl-0", 0, "mx-0", 0)
-    wire("vl-1", 0, "mx-0", 1)
-    wire("mx-0", 0, "mx-1", 0)
-    wire("vl-2", 0, "mx-1", 1)
-    wire("mx-1", 0, "mx-2", 0)
-    wire("vl-3", 0, "mx-2", 1)
-    wire("mx-2", 0, "mx-3", 0)
-    wire("vl-4", 0, "mx-3", 1)
-    wire("mx-3", 0, "mx-4", 0)
-    wire("vl-5", 0, "mx-4", 1)
+    # Wire receive~ into +~ cascade
+    wire("mr-0", 0, "mx-0", 0)
+    wire("mr-1", 0, "mx-0", 1)
+    for s in range(1, 5):
+        wire(f"mx-{s-1}", 0, f"mx-{s}", 0)
+        wire(f"mr-{s+1}", 0, f"mx-{s}", 1)
 
-    # Master gain
-    box("mx-gain", "gain~", 30, mix_y + 30, 350, 28, ni=1, no=2,
-        ot=["signal", ""], parameter_enable=0, orientation=1)
+    # Master gain (horizontal slider)
+    box("mx-gain", "gain~", 75, add_y + 30, 500, 30,
+        ni=1, no=2, ot=["signal", ""],
+        parameter_enable=0, orientation=1)
     wire("mx-4", 0, "mx-gain", 0)
 
-    # Output
-    box("mx-scope", "scope~", 420, mix_y + 20, 200, 55, ni=2, no=0)
-    box("mx-meter", "meter~", 30, mix_y + 64, 350, 18, ot=["float"])
-    box("mx-dac", "newobj", 30, mix_y + 90, 60, 22, "dac~ 1 2", ni=2, no=0)
+    # Meter + Scope
+    box("mx-meter", "meter~", 75, add_y + 68, 500, 18, ot=["float"])
+    box("mx-scope", "scope~", 600, add_y + 30, 200, 56, ni=2, no=0)
+    wire("mx-gain", 0, "mx-meter", 0)
+    wire("mx-gain", 0, "mx-scope", 0)
+
+    # DAC + audio toggle
+    dac_y = add_y + 95
+    box("mx-dac", "newobj", 75, dac_y, 60, 22, "dac~ 1 2", ni=2, no=0)
     wire("mx-gain", 0, "mx-dac", 0)
     wire("mx-gain", 0, "mx-dac", 1)
-    wire("mx-gain", 0, "mx-scope", 0)
-    wire("mx-gain", 0, "mx-meter", 0)
 
-    # Audio toggle
-    box("out-at", "toggle", 120, mix_y + 86, 25, 25, ot=["int"])
-    box("out-as", "newobj", 120, mix_y + 114, 45, 22, "sel 0 1", no=3, ot=["bang","bang",""])
-    box("out-ms", "message", 120, mix_y + 140, 35, 22, "stop", ni=2, ot=[""])
-    box("out-mw", "message", 170, mix_y + 140, 68, 22, "startwindow", ni=2, ot=[""])
-    comment("out-al", 150, mix_y + 88, "AUDIO", w=50)
+    box("out-at", "toggle", 165, dac_y - 2, 25, 25, ot=["int"])
+    comment("out-al", 195, dac_y, "AUDIO ON/OFF", fontface=1, w=90)
+    box("out-as", "newobj", 165, dac_y + 30, 45, 22,
+        "sel 0 1", no=3, ot=["bang", "bang", ""])
+    box("out-ms", "message", 165, dac_y + 60, 35, 22,
+        "stop", ni=2, ot=[""])
+    box("out-mw", "message", 210, dac_y + 60, 68, 22,
+        "startwindow", ni=2, ot=[""])
     wire("out-at", 0, "out-as", 0)
     wire("out-as", 0, "out-ms", 0)
     wire("out-as", 1, "out-mw", 0)
     wire("out-ms", 0, "mx-dac", 0)
     wire("out-mw", 0, "mx-dac", 0)
 
-    # Hints
-    comment("h1", 420, mix_y + 80, "Click grid to edit patterns. Toggle PLAY to start.", w=400)
-    comment("h2", 420, mix_y + 100, "Repeated hits build pressure. Silence cools down.", w=400)
-    comment("h3", 420, mix_y + 120, "Select voice tab to edit macros. MIDI pads trigger voices.", w=450)
+    # ═══════════════════════ VOICE EDITOR ═══════════════════════
+    section_header("sec-ed", 30, Y_EDITOR - 15, "VOICE EDITOR")
+
+    # Voice select tab
+    box("vc-tab", "tab", 75, Y_EDITOR, 750, 28, ni=1, no=3,
+        ot=["int", "", ""],
+        parameter_enable=0, fontface=1, fontsize=12.0,
+        tabs=["MASS", "VEIN", "SHARD", "HUSK", "FAULT", "HALO"])
+
+    # Voice controller JS
+    box("vc-js", "newobj", 75, Y_EDITOR + 35, 750, 22,
+        "js voicectrl.js", ni=2, no=7,
+        ot=["", "", "", "", "", "", ""])
+    wire("vc-tab", 0, "vc-js", 0)
+
+    # Init voice params on load
+    box("vc-initmsg", "message", 855, Y_EDITOR, 35, 22,
+        "init", ni=2, ot=[""])
+    wire("tr-lb", 0, "vc-initmsg", 0)
+    wire("vc-initmsg", 0, "vc-js", 0)
+
+    # Send voicectrl outlets 0-5 to voice param receives
+    for i in range(6):
+        sx = VOICE_COLS[i]
+        box(f"vp-{i}", "newobj", sx, Y_EDITOR + 65, 75, 22,
+            f"send v{i}_p", ni=1, no=0)
+        wire("vc-js", i, f"vp-{i}", 0)
+
+    # UI update route (outlet 6 → route → set dials)
+    all_params = MACROS + ["pitch", "decay_ms", "exciter_type", "body_type"]
+    all_labels = MACRO_LABELS + ["PITCH", "DECAY", "EXC TYPE", "BODY TYPE"]
+    macro_route = "route " + " ".join(all_params)
+    n_params = len(all_params)
+
+    box("vc-route", "newobj", 75, Y_EDITOR + 95, 900, 22, macro_route,
+        ni=1, no=n_params + 1, ot=[""] * (n_params + 1))
+    wire("vc-js", 6, "vc-route", 0)
+
+    # 12 parameter dials (4 rows × 3 cols to keep compact, or single row)
+    # Single row, 90px spacing = 12 × 90 = 1080 — fits in window
+    dial_y = Y_EDITOR + 125
+    dial_spacing = 90
+
+    for j, (pname, plabel) in enumerate(zip(all_params, all_labels)):
+        dx = 30 + j * dial_spacing
+
+        # Label
+        comment(f"dl-{j}", dx, dial_y, plabel, fontsize=10.0, w=80)
+
+        # Dial
+        box(f"dd-{j}", "dial", dx + 10, dial_y + 18, 40, 40,
+            no=1, ot=["int"], parameter_enable=0)
+
+        # "set $1" message (for UI update from route)
+        box(f"ds-{j}", "message", dx + 10, dial_y + 62, 55, 22,
+            "set $1", ni=2, ot=[""])
+        wire("vc-route", j, f"ds-{j}", 0)
+        wire(f"ds-{j}", 0, f"dd-{j}", 0)
+
+        # prepend param name (dial → voicectrl inlet 1)
+        box(f"dp-{j}", "newobj", dx + 10, dial_y + 90, 80, 22,
+            f"prepend {pname}", ot=[""])
+        wire(f"dd-{j}", 0, f"dp-{j}", 0)
+        wire(f"dp-{j}", 0, "vc-js", 1)
+
+    # ═══════════════════════ MIDI INPUT ═══════════════════════
+    section_header("sec-mi", 30, Y_MIDI - 15, "MIDI INPUT")
+
+    box("midi-in", "newobj", 75, Y_MIDI, 45, 22,
+        "notein", no=3, ot=["int", "int", "int"])
+    box("midi-strip", "newobj", 75, Y_MIDI + 30, 60, 22,
+        "stripnote", ni=2, no=2, ot=["int", "int"])
+    note_nums = " ".join(str(v["midi_note"]) for v in VOICES)
+    box("midi-sel", "newobj", 75, Y_MIDI + 60, 160, 22,
+        f"select {note_nums}",
+        ni=1, no=7, ot=["bang"] * 6 + [""])
+
+    wire("midi-in", 0, "midi-strip", 0)
+    wire("midi-in", 1, "midi-strip", 1)
+    wire("midi-strip", 0, "midi-sel", 0)
+
+    # MIDI → click~ triggers (via send objects to avoid long wires)
+    for i in range(6):
+        # select outlet → button click on voice
+        # Use send/receive to keep it clean
+        box(f"mt-{i}", "newobj", 255 + i * 120, Y_MIDI + 60, 75, 22,
+            f"send v{i}_trig", ni=1, no=0)
+        wire("midi-sel", i, f"mt-{i}", 0)
+
+    # Add receive objects at each voice click~
+    for i in range(6):
+        cx = VOICE_COLS[i]
+        box(f"vt-{i}", "newobj", cx + 60, Y_VOICES + 45, 85, 22,
+            f"receive v{i}_trig", ot=["bang"])
+        wire(f"vt-{i}", 0, f"vc-{i}", 0)
+
+    comment("midi-hint", 75, Y_MIDI + 90,
+            "C2=Mass  D2=Vein  E2=Shard  F2=Husk  G2=Fault  A2=Halo",
+            w=420)
+
+    # ═══════════════════════ HINTS ═══════════════════════
+    hint_y = Y_MIDI + 120
+    comment("h1", 75, hint_y,
+            "Click grid to edit patterns. Toggle PLAY to start.", w=400)
+    comment("h2", 75, hint_y + 18,
+            "Repeated hits build pressure. Silence cools down.", w=400)
+    comment("h3", 75, hint_y + 36,
+            "Select voice tab to edit macros. MIDI pads trigger voices.",
+            w=450)
 
     # ═══════════════════════ ASSEMBLE ═══════════════════════
     return {
         "patcher": {
             "fileversion": 1,
-            "appversion": {"major": 9, "minor": 0, "revision": 0, "architecture": "x64", "modernui": 1},
+            "appversion": {"major": 9, "minor": 0, "revision": 0,
+                           "architecture": "x64", "modernui": 1},
             "classnamespace": "box",
-            "rect": [20, 40, 1060, 820],
+            "rect": [20, 40, 1160, 1060],
             "bglocked": 0,
             "openinpresentation": 0,
             "default_fontsize": 12.0,
@@ -431,6 +559,7 @@ def build():
             "lines": _lines,
         }
     }
+
 
 if __name__ == "__main__":
     patch = build()
