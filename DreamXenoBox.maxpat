@@ -1863,18 +1863,25 @@
 					"patching_rect": [
 						30,
 						404,
-						500,
-						24
+						580,
+						28
 					],
 					"outlettype": [
 						"int",
 						"",
 						""
 					],
-					"text": "MASS VEIN SHARD HUSK FAULT HALO",
 					"parameter_enable": 0,
-					"tabsize": 6,
-					"fontface": 1
+					"fontface": 1,
+					"fontsize": 12.0,
+					"tabs": [
+						"MASS",
+						"VEIN",
+						"SHARD",
+						"HUSK",
+						"FAULT",
+						"HALO"
+					]
 				}
 			},
 			{

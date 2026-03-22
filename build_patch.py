@@ -296,11 +296,10 @@ def build():
     # ═══════════════════════ VOICE CTRL (tabbed param editor) ═══════════════════════
     ed_y = voice_y + 95
 
-    # Voice select tab
-    tab_names = " ".join(v["name"] for v in VOICES)
-    box("vc-tab", "tab", 30, ed_y, 500, 24,
-        text=tab_names, ni=1, no=3, ot=["int", "", ""],
-        parameter_enable=0, tabsize=6, fontface=1)
+    # Voice select tab (6 tabs, one per voice)
+    box("vc-tab", "tab", 30, ed_y, 580, 28, ni=1, no=3, ot=["int", "", ""],
+        parameter_enable=0, fontface=1, fontsize=12.0,
+        tabs=["MASS", "VEIN", "SHARD", "HUSK", "FAULT", "HALO"])
 
     # Voice controller JS
     box("vc-js", "newobj", 550, ed_y, 220, 22,
