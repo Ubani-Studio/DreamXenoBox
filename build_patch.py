@@ -435,6 +435,57 @@ def build():
     box("tr-cnt", "newobj", 800, ty + 120, 110, 22, "counter 0 287",
         no=4, ot=["int", "", "", "int"])
     wire("tr-gate", 0, "tr-cnt", 0)
+    # Signal vector size is NOT set from here. adstatus reported a menu index
+    # rather than the value, so it was removed; set it in Options > Audio Status.
+    # It matters: edge~ reports at the start of the signal vector containing the
+    # transition, so at 512 samples every trigger is rounded onto a 10.7 ms grid
+    # while a 1/16 step at 120bpm is 125 ms. That is heard as glitching. 64
+    # samples is 1.33 ms and inaudible.
+
+    # ── Step interval readout ────────────────────────────────────────
+    # Measures the gap between successive step bangs, in ms, inside the patch.
+    # No recording, no ASIO problem, no clicking. t b b fires its RIGHT outlet
+    # first, so the timer is stopped and reports before it is restarted.
+    # At 120bpm 1/16 this should read 125.0 and barely move. Watch WORST: that
+    # is the number that says whether the clock is holding.
+    box("tr-tt", "newobj", 530, 95, 45, 22, "t b b",
+        no=2, ot=["bang", "bang"])
+    wire("tr-cnt", 0, "tr-tt", 0)
+    box("tr-timer", "newobj", 585, 95, 55, 22, "timer",
+        ni=2, no=1, ot=[""])
+    wire("tr-tt", 1, "tr-timer", 1)
+    wire("tr-tt", 0, "tr-timer", 0)
+    box("tr-tnow", "flonum", 650, 95, 60, 22, no=2, ot=["", "bang"])
+    wire("tr-timer", 0, "tr-tnow", 0)
+    comment("tr-tnow-l", 715, 95, "STEP ms", w=60)
+    box("tr-tpeak", "newobj", 585, 118, 55, 22, "peak", ni=2, no=1,
+        ot=[""])
+    wire("tr-timer", 0, "tr-tpeak", 0)
+    box("tr-tworst", "flonum", 650, 118, 60, 22, no=2, ot=["", "bang"])
+    wire("tr-tpeak", 0, "tr-tworst", 0)
+    comment("tr-tworst-l", 715, 118, "WORST ms", w=70)
+    # Running minimum as well, so the RANGE is visible. One number cannot show
+    # jitter; 118 to 133 says everything that "125, fluctuating" does not.
+    box("tr-ttrough", "newobj", 790, 95, 60, 22, "trough", ni=2, no=1, ot=[""])
+    wire("tr-timer", 0, "tr-ttrough", 0)
+    box("tr-tbest", "flonum", 855, 95, 60, 22, no=2, ot=["", "bang"])
+    wire("tr-ttrough", 0, "tr-tbest", 0)
+    comment("tr-tbest-l", 920, 95, "BEST ms", w=60)
+
+    # Reset both whenever PLAY is switched on. Without this, peak holds the gap
+    # between patch load and the first step, which is minutes, and the readout
+    # is useless from then on. That is exactly what it did.
+    box("tr-trst", "newobj", 790, 141, 45, 22, "t b b", no=2,
+        ot=["bang", "bang"])
+    wire("tr-play", 0, "tr-trst", 0)
+    box("tr-rst-hi", "message", 845, 141, 45, 22, "99999")
+    wire("tr-trst", 1, "tr-rst-hi", 0)
+    wire("tr-rst-hi", 0, "tr-ttrough", 1)
+    box("tr-rst-lo", "message", 895, 141, 30, 22, "0")
+    wire("tr-trst", 0, "tr-rst-lo", 0)
+    wire("tr-rst-lo", 0, "tr-tpeak", 1)
+    comment("tr-rst-l", 935, 141, "auto-reset on play", w=120)
+
     comment("tr-sl", 920, ty + 120, "STEP", w=40)
     box("tr-sn", "number", 965, ty + 120, 45, 22, no=2, ot=["", "bang"])
     wire("tr-cnt", 0, "tr-sn", 0)
@@ -497,12 +548,13 @@ def build():
         "js sequencer.js", ni=2, no=8, ot=["", "", "", "", "", "", "", ""])
     wire("tr-cnt", 0, "sq-js", 0)
     wire("sq-grid", 0, "sq-js", 1)
-    # Never let a UI redraw share a call with a trigger. qlim defers the
-    # indicator to the low-priority queue and throttles it to ~30fps; the
-    # drums are already out of the outlet by the time it repaints.
-    box("sq-qlim", "newobj", GRID_X + js_w + 15, Y_SEQ_JS, 70, 22, "qlim 33")
-    wire("sq-js", 7, "sq-qlim", 0)
-    wire("sq-qlim", 0, "sq-ind", 0)
+    # Direct, NOT deferred. A qlim here was tried and reverted: it put the
+    # highlight in the low-priority queue, so the display visibly lagged the
+    # audio and the position could no longer be trusted to read the pattern by.
+    # A 32-cell multislider at 8 steps a second is cheap; the cost that was
+    # actually feared is the list being BUILT inside the trigger call, and
+    # sequencer.js already pre-allocates that array. Measure before deferring.
+    wire("sq-js", 7, "sq-ind", 0)
 
     # Init matrixctrl with default patterns
     init_parts = []
@@ -691,6 +743,53 @@ def build():
     box("mx-dac", "newobj", 75, dac_y, 60, 22, "dac~ 1 2", ni=2, no=0)
     wire("mx-limL", 0, "mx-dac", 0)
     wire("mx-limR", 0, "mx-dac", 1)
+
+    # ── Measurement tap ──────────────────────────────────────────────
+    # A recorder on the master, permanently wired, so timing can be MEASURED
+    # rather than argued about. Desktop loopback cannot capture this rig at all:
+    # output goes to a Behringer UMC 404HD over ASIO, and WASAPI loopback never
+    # sees ASIO. Recording here is better anyway, because it captures what the
+    # engine produced with no driver in the path.
+    #
+    # Click the message to write 20 seconds to the repo root, then:
+    #   python3 tools/jitter.py --file measure.wav --bpm 120 --div 16
+    rec_x = 640
+    box("mx-rec", "newobj", rec_x, dac_y, 210, 22,
+        "sfrecord~ 2", ni=2, no=0)
+    wire("mx-limL", 0, "mx-rec", 0)
+    wire("mx-limR", 0, "mx-rec", 1)
+    comment("mx-reclbl", rec_x, dac_y - 16,
+            "MEASURE  records 20s to measure.wav", fontface=1, w=230)
+    # An explicit chain, not a comma message. sfrecord~ needs open, then start,
+    # then a stop later; putting all three in one message box sends them in the
+    # same tick and writes an empty file. t b b fires right outlet first, so the
+    # file is open before recording starts.
+    box("mx-recbtn", "button", rec_x, dac_y + 30, 24, 24)
+    box("mx-rect", "newobj", rec_x + 30, dac_y + 30, 45, 22, "t b b",
+        no=2, ot=["bang", "bang"])
+    wire("mx-recbtn", 0, "mx-rect", 0)
+    # An ABSOLUTE Windows path, not a bare filename. A relative name resolves
+    # against Max's own default directory, and this patch lives on a
+    # \\wsl.localhost UNC share which Max will not write to; the first attempt
+    # produced no file and no error anywhere, which is exactly that failure.
+    # E: is a plain local drive and is readable from WSL at /mnt/e.
+    box("mx-recopen", "message", rec_x + 150, dac_y + 60, 220, 22,
+        "open E:/tmp/measure.wav")
+    wire("mx-rect", 1, "mx-recopen", 0)
+    wire("mx-recopen", 0, "mx-rec", 0)
+    box("mx-recon", "message", rec_x, dac_y + 60, 30, 22, "1")
+    wire("mx-rect", 0, "mx-recon", 0)
+    wire("mx-recon", 0, "mx-rec", 0)
+    # So the console says whether the click reached the chain at all. Silence
+    # from a print is a different diagnosis from silence from sfrecord~.
+    box("mx-recprint", "newobj", rec_x + 150, dac_y + 90, 130, 22,
+        "print MEASURE", no=0)
+    wire("mx-rect", 0, "mx-recprint", 0)
+    box("mx-recdel", "newobj", rec_x + 40, dac_y + 90, 90, 22, "delay 20000")
+    wire("mx-rect", 0, "mx-recdel", 0)
+    box("mx-recoff", "message", rec_x, dac_y + 90, 30, 22, "0")
+    wire("mx-recdel", 0, "mx-recoff", 0)
+    wire("mx-recoff", 0, "mx-rec", 0)
 
     # Audio toggle
     box("out-at", "toggle", 165, dac_y - 2, 25, 25, ot=["int"])
