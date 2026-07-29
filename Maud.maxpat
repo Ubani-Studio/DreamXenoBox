@@ -540,6 +540,117 @@
 			},
 			{
 				"box": {
+					"id": "av-sig",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						75,
+						335,
+						110,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "adstatus sigvs"
+				}
+			},
+			{
+				"box": {
+					"id": "av-sigp",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						195,
+						335,
+						130,
+						22
+					],
+					"text": "print SIGVS"
+				}
+			},
+			{
+				"box": {
+					"id": "av-io",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						75,
+						361,
+						110,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "adstatus iovs"
+				}
+			},
+			{
+				"box": {
+					"id": "av-iop",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						195,
+						361,
+						130,
+						22
+					],
+					"text": "print IOVS"
+				}
+			},
+			{
+				"box": {
+					"id": "av-poll",
+					"maxclass": "message",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						335,
+						335,
+						50,
+						22
+					],
+					"text": "bang"
+				}
+			},
+			{
+				"box": {
+					"id": "av-pdel",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						395,
+						335,
+						90,
+						22
+					],
+					"text": "delay 2000"
+				}
+			},
+			{
+				"box": {
+					"id": "av-l",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						75,
+						319,
+						460,
+						20
+					],
+					"text": "VECTORS  bang to print the live lists. adstatus sets by INDEX and the index moves when the driver buffer changes, so nothing is set from here."
+				}
+			},
+			{
+				"box": {
 					"id": "tr-tt",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -15028,6 +15139,78 @@
 					],
 					"destination": [
 						"tr-cnt",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"av-sig",
+						0
+					],
+					"destination": [
+						"av-sigp",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"av-io",
+						0
+					],
+					"destination": [
+						"av-iop",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"av-poll",
+						0
+					],
+					"destination": [
+						"av-sig",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"av-poll",
+						0
+					],
+					"destination": [
+						"av-io",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"av-pdel",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"av-pdel",
+						0
+					],
+					"destination": [
+						"av-poll",
 						0
 					]
 				}

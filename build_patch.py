@@ -435,6 +435,42 @@ def build():
     box("tr-cnt", "newobj", 800, ty + 120, 110, 22, "counter 0 287",
         no=4, ot=["int", "", "", "int"])
     wire("tr-gate", 0, "tr-cnt", 0)
+    # ── Audio vector control, read AND set ──────────────────────────
+    # Earlier an adstatus display was removed because it reported 9, which is
+    # not a vector size, so it was emitting a menu index. This keeps adstatus but
+    # prints what it actually says, so the value is observed rather than assumed,
+    # and offers both a raw value and an index to set with. Signal vector can
+    # never exceed IO vector, and with an ASIO device the IO buffer is set in the
+    # interface control panel, not in Max, which is the usual reason the menu
+    # appears stuck.
+    avx, avy = 75, ty + 250
+    box("av-sig", "newobj", avx, avy, 110, 22, "adstatus sigvs", ot=[""])
+    box("av-sigp", "newobj", avx + 120, avy, 130, 22, "print SIGVS", no=0)
+    wire("av-sig", 0, "av-sigp", 0)
+    box("av-io", "newobj", avx, avy + 26, 110, 22, "adstatus iovs", ot=[""])
+    box("av-iop", "newobj", avx + 120, avy + 26, 130, 22, "print IOVS", no=0)
+    wire("av-io", 0, "av-iop", 0)
+    box("av-poll", "message", avx + 260, avy, 50, 22, "bang")
+    wire("av-poll", 0, "av-sig", 0)
+    wire("av-poll", 0, "av-io", 0)
+    box("av-pdel", "newobj", avx + 320, avy, 90, 22, "delay 2000")
+    wire("tr-lb", 0, "av-pdel", 0)
+    wire("av-pdel", 0, "av-poll", 0)
+    # adstatus sets by INDEX, not by value. Proven by its own output: it emits
+    # "append 8, append 16, append 32, append 64, ..." to build a menu, then
+    # "set <index>" for the current choice. So 64 is index 3.
+    #
+    # It reported "set 9" on open, which on a list doubling from 8 is near the
+    # top of the range. That is tens of ms per vector, and edge~ reports at
+    # vector boundaries, so every trigger was being rounded onto that grid
+    # against a 125 ms step. This sets it at load, behind a delay so the audio
+    # driver is up first, then polls and prints so the result is observed rather
+    # than assumed.
+    comment("av-l", avx, avy - 16,
+            "VECTORS  bang to print the live lists. adstatus sets by INDEX and "
+            "the index moves when the driver buffer changes, so nothing is set "
+            "from here.", w=460)
+
     # Signal vector size is NOT set from here. adstatus reported a menu index
     # rather than the value, so it was removed; set it in Options > Audio Status.
     # It matters: edge~ reports at the start of the signal vector containing the
