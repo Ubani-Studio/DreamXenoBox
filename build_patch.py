@@ -671,8 +671,14 @@ def build():
         wire("nq-lenload", 0, f"nq-coll-{i}", 0)
         wire(f"len-{i}", 0, f"nq-coll-{i}", 0)
         # step % length, length arriving in the cold right inlet
-        box(f"nq-mod-{i}", "newobj", vx, ny + 28, 110, 22,
-            "expr $i1 % $i2", ni=2, ot=[""])
+        box(f"nq-mod-{i}", "newobj", vx, ny + 28, 150, 22,
+            "expr $i1 % max($i2\\, 1)", ni=2, ot=[""])
+        # The coll is filled by the same loadbang that drives the length menus,
+        # and loadbang fan-out order is not guaranteed, so the menu fired into an
+        # empty coll and the right inlet stayed 0. loadmess is independent of
+        # that ordering and seeds a real default.
+        box(f"nq-len0-{i}", "newobj", vx + 155, ny + 28, 85, 22, "loadmess 16")
+        wire(f"nq-len0-{i}", 0, f"nq-mod-{i}", 1)
         wire(f"nq-coll-{i}", 0, f"nq-mod-{i}", 1)
         wire("tr-cnt", 0, f"nq-mod-{i}", 0)
         wire(f"nq-mod-{i}", 0, f"nq-tab-{i}", 0)
@@ -683,6 +689,8 @@ def build():
         box(f"nq-sw-{i}", "newobj", vx, ny + 140, 60, 22, "switch 2",
             ni=3, ot=[""])
         wire("nq-swp", 0, f"nq-sw-{i}", 0)
+        box(f"nq-sw0-{i}", "newobj", vx + 65, ny + 140, 80, 22, "loadmess 1")
+        wire(f"nq-sw0-{i}", 0, f"nq-sw-{i}", 0)
         wire("sq-js", i, f"nq-sw-{i}", 1)
         wire(f"nq-sel-{i}", 0, f"nq-sw-{i}", 2)
         wire(f"nq-sw-{i}", 0, f"fl-tp-{i}", 0)
@@ -1289,6 +1297,10 @@ def build():
         ot=["", "", "", "", "", "", "", ""])
 
     # Init kit manager on load
+    box("km-savedef", "message", 75, Y_KITS - 60, 150, 22, "save_default")
+    wire("km-savedef", 0, "km-js", 0)
+    box("km-cleardef", "message", 235, Y_KITS - 60, 110, 22, "clear_default")
+    wire("km-cleardef", 0, "km-js", 0)
     box("km-init", "message", 855, Y_KITS, 70, 22,
         "init_defaults", ni=2, ot=[""])
     wire("tr-lb", 0, "km-init", 0)
@@ -1513,18 +1525,38 @@ def build_presentation():
     plabel("p-au-l", sx + 120, 28, "Audio", w=60)
     present("out-at", sx + 120, 46, 26, 26)
 
+    # Persisting the current state as the load default. kitmanager writes the
+    # whole snapshot to maud_default.json beside the patch and reads it at init,
+    # so "how it is now" survives a reopen instead of dying with the patch.
+    dx2 = sx + 200
+    plabel("p-def-l", dx2, 28, "Load state", w=110)
+    present("km-savedef", dx2, 46, 110, 22)
+    present("km-cleardef", dx2 + 118, 46, 62, 22)
+
     prect("p-r1", M, 88, PW - 2 * M, 1)
 
     # ── Sequencer ─────────────────────────────────────────────────
     gy = 128
-    plabel("p-seq-l", M, 104, "Sequencer", w=200, size=13, col=FG)
-    present("sq-ind", M + 92, gy, 780, 10)
+    plabel("p-seq-l", M, 104, "Sequencer", w=88, size=13, col=FG)
+    present("sq-ind", M + 92, gy + 2, 780, 10)
     present("sq-grid", M + 92, gy + 16, 780, 150)
     for i, v in enumerate(VOICES):
         plabel(f"p-vn-{i}", M, gy + 22 + i * 25, v["name"], w=86, size=11,
                col=FG)
         present(f"len-{i}", M + 884, gy + 18 + i * 25, 56, 20)
     plabel("p-len-l", M + 884, gy - 2, "Length", w=60)
+
+    # Bar and beat markers. 780px over 32 steps is 24.375px a step.
+    step_w = 780.0 / 32
+    for b in range(1, 8):
+        bx = M + 92 + b * 4 * step_w
+        strong = (b % 4 == 0)          # every bar
+        half = (b % 2 == 0)            # every half bar
+        col = [1, 1, 1, 0.22] if strong else ([1, 1, 1, 0.12] if half else [1, 1, 1, 0.06])
+        prect(f"p-bar-{b}", bx - 1, gy + 2, 1, 164, col)
+    for b in range(8):
+        plabel(f"p-bn-{b}", M + 92 + b * 4 * step_w + 2, gy - 15,
+               str(b + 1), w=18, size=9)
 
     prect("p-r2", M, gy + 184, PW - 2 * M, 1)
 

@@ -102,6 +102,61 @@ function init_defaults() {
 	// Save as Kit 1 "INIT"
 	kit_names[0] = "INIT";
 	kits[0] = snapshot();
+
+	// If a saved default exists on disk, it wins. This is what makes "how it is
+	// now" survive a reopen: the built-ins above are only the fallback for a
+	// patch that has never had one written.
+	var d = read_default();
+	if (d !== null) {
+		kits[1] = d;
+		kit_names[1] = "DEFAULT";
+		restore_kit(d);
+		outlet(3, "status", "loaded saved default");
+	}
+}
+
+var DEFAULT_FILE = "maud_default.json";
+
+// Write the current state to disk as the load default. Everything the kit
+// system already captures — patterns, lengths, voice params, flam, levels,
+// swing, groove, LFO — goes in one file beside the patch.
+function save_default() {
+	try {
+		var f = new File(DEFAULT_FILE, "write", "TEXT");
+		if (!f.isopen) {
+			outlet(3, "status", "could not open " + DEFAULT_FILE + " for write");
+			return;
+		}
+		f.writeline(JSON.stringify(snapshot()));
+		f.close();
+		outlet(3, "status", "saved current state as the load default");
+	} catch (e) {
+		outlet(3, "status", "save_default failed: " + e.message);
+	}
+}
+
+// Read it back, if it exists. Returns null when there is no file, so the
+// built-in defaults still apply on a fresh install.
+function read_default() {
+	try {
+		var f = new File(DEFAULT_FILE, "read", "TEXT");
+		if (!f.isopen) return null;
+		var txt = "", line;
+		while ((line = f.readline()) !== null && line !== undefined) txt += line;
+		f.close();
+		return txt.length ? JSON.parse(txt) : null;
+	} catch (e) {
+		return null;
+	}
+}
+
+// Forget it and go back to the built-in defaults.
+function clear_default() {
+	try {
+		var f = new File(DEFAULT_FILE, "write", "TEXT");
+		if (f.isopen) { f.writeline(""); f.close(); }
+		outlet(3, "status", "load default cleared");
+	} catch (e) {}
 }
 
 // Take a snapshot of current state
@@ -236,8 +291,12 @@ function load(slot) {
 		outlet(3, "status", "Empty slot");
 		return;
 	}
+	restore_kit(kits[slot]);
+}
 
-	var kit = kits[slot];
+// The restore body, callable with a kit object rather than only a slot index.
+function restore_kit(kit) {
+	if (!kit) return;
 
 	// Restore voice params → outlet 0 (to voicectrl via "restore" message)
 	for (var i = 0; i < NUM_VOICES; i++) {
@@ -370,6 +429,8 @@ function anything() {
 	var msg = messagename;
 	var args = arrayfromargs(arguments);
 
+	if (msg === "save_default") { save_default(); return; }
+	if (msg === "clear_default") { clear_default(); return; }
 	if (msg === "save") {
 		save(args[0]);
 	} else if (msg === "load") {
