@@ -636,6 +636,75 @@ def build():
         wire(f"vlf-{i}", 0, f"vlk-{i}", 0)
         wire(f"vlk-{i}", 0, "km-js", 0)
 
+
+    # ═══════════════ NATIVE SEQUENCER (scheduler priority) ═══════════════
+    # Why this exists: js runs in Max's LOW-PRIORITY queue, so every step
+    # decision was scheduled behind UI redraws and garbage collection. The clock
+    # was already audio-rate; the decision was not. These objects run in the
+    # scheduler, which with overdrive on is high priority.
+    #
+    # The JS path stays wired. sq-sel chooses which one drives the voices, so
+    # both can be heard on the same pattern and the readout compared. 1 = js,
+    # 2 = native.
+    ny = Y_SEQ_JS + 40
+    comment("nq-l", GRID_X, ny - 16,
+            "NATIVE SEQUENCER   toggle: off = js, on = native", fontface=1, w=330)
+    box("nq-sw", "toggle", GRID_X + 340, ny - 18, 20, 20, ot=["int"])
+    box("nq-swp", "newobj", GRID_X + 365, ny - 18, 40, 22, "+ 1")
+    wire("nq-sw", 0, "nq-swp", 0)
+
+    # Length lookup: the umenu emits an index, the modulo needs the step count.
+    # One coll per voice keeps the routing trivial; they share one loadbang.
+    box("nq-lenload", "message", GRID_X + 420, ny - 18, 300, 22,
+        "store 0 4, store 1 8, store 2 12, store 3 16, store 4 24, store 5 32")
+    wire("tr-lb", 0, "nq-lenload", 0)
+
+    # Pattern storage, one table of 32 per voice. A table takes a two-element
+    # list <index> <value> to write and an int to read, both at scheduler
+    # priority and both documented.
+    for i in range(6):
+        vx = VOICE_COLS[i]
+        box(f"nq-tab-{i}", "newobj", vx, ny + 84, 110, 22,
+            f"table maud_v{i} 32", ni=2, no=2, ot=["int", "bang"])
+        box(f"nq-coll-{i}", "newobj", vx, ny, 95, 22, f"coll maud_len{i}",
+            ni=2, no=4, ot=["", "", "", ""])
+        wire("nq-lenload", 0, f"nq-coll-{i}", 0)
+        wire(f"len-{i}", 0, f"nq-coll-{i}", 0)
+        # step % length, length arriving in the cold right inlet
+        box(f"nq-mod-{i}", "newobj", vx, ny + 28, 110, 22,
+            "expr $i1 % $i2", ni=2, ot=[""])
+        wire(f"nq-coll-{i}", 0, f"nq-mod-{i}", 1)
+        wire("tr-cnt", 0, f"nq-mod-{i}", 0)
+        wire(f"nq-mod-{i}", 0, f"nq-tab-{i}", 0)
+        box(f"nq-sel-{i}", "newobj", vx, ny + 112, 45, 22, "sel 1",
+            no=2, ot=["bang", ""])
+        wire(f"nq-tab-{i}", 0, f"nq-sel-{i}", 0)
+        # switch 2: inlet 1 = js, inlet 2 = native. Selector picks the source.
+        box(f"nq-sw-{i}", "newobj", vx, ny + 140, 60, 22, "switch 2",
+            ni=3, ot=[""])
+        wire("nq-swp", 0, f"nq-sw-{i}", 0)
+        wire("sq-js", i, f"nq-sw-{i}", 1)
+        wire(f"nq-sel-{i}", 0, f"nq-sw-{i}", 2)
+        wire(f"nq-sw-{i}", 0, f"fl-tp-{i}", 0)
+
+    # Grid writes. unpack emits RIGHT to LEFT, so value lands in pack's cold
+    # inlet, then row sets the gate, then column fires the pair. That ordering
+    # is why no trigger object is needed here.
+    box("nq-unp", "newobj", GRID_X, ny + 168, 110, 22, "unpack 0 0 0",
+        no=3, ot=["int", "int", "int"])
+    wire("sq-grid", 0, "nq-unp", 0)
+    box("nq-pk", "newobj", GRID_X, ny + 196, 70, 22, "pack 0 0", ni=2, ot=[""])
+    wire("nq-unp", 0, "nq-pk", 0)
+    wire("nq-unp", 2, "nq-pk", 1)
+    box("nq-row", "newobj", GRID_X + 130, ny + 168, 40, 22, "+ 1")
+    wire("nq-unp", 1, "nq-row", 0)
+    box("nq-gate", "newobj", GRID_X, ny + 224, 200, 22, "gate 6",
+        ni=2, no=6, ot=["", "", "", "", "", ""])
+    wire("nq-row", 0, "nq-gate", 0)
+    wire("nq-pk", 0, "nq-gate", 1)
+    for i in range(6):
+        wire("nq-gate", i, f"nq-tab-{i}", 0)
+
     # ═══════════════════════ MIXER (STEREO) ═══════════════════════
     section_header("sec-mx", 30, Y_MIXER - 15, "MIXER")
 
@@ -888,7 +957,6 @@ def build():
         fx = VOICE_COLS[i]
         box(f"fl-tp-{i}", "newobj", fx, Y_FLAM - 35, 95, 22,
             f"prepend trig {i}", ot=[""])
-        wire("sq-js", i, f"fl-tp-{i}", 0)
         wire(f"fl-tp-{i}", 0, "fl-js", 0)
 
     # Flam engine JS (7 outlets: 0-5=voice bangs, 6=status)
@@ -1335,15 +1403,17 @@ def build():
             w=450)
 
     # ═══════════════════════ ASSEMBLE ═══════════════════════
+    build_presentation()
     return {
         "patcher": {
             "fileversion": 1,
             "appversion": {"major": 9, "minor": 0, "revision": 0,
                            "architecture": "x64", "modernui": 1},
             "classnamespace": "box",
-            "rect": [20, 40, 1160, 2950],
+            "rect": [40, 60, PW, PH],
             "bglocked": 0,
-            "openinpresentation": 0,
+            "openinpresentation": 1,
+            "bgcolor": [0.0, 0.0, 0.0, 1.0],
             "default_fontsize": 12.0,
             "default_fontname": "Arial",
             "gridsize": [15.0, 15.0],
@@ -1356,6 +1426,130 @@ def build():
             "lines": _lines,
         }
     }
+
+
+
+
+# ═══════════════════════ PRESENTATION LAYOUT ═══════════════════════
+# Everything above builds the patching view, where the wires live. This puts
+# only the things you touch on a clean surface. Chrysalis rules: black ground,
+# borders rather than fills, sharp edges, sentence case, one accent, restraint.
+#
+# Hand-edited colours from the April patch are folded in here rather than left
+# in the .maxpat, which is the file that gets overwritten on every regenerate.
+# That is why they kept disappearing.
+
+PW, PH = 1180, 760
+ACCENT = [0.30, 0.80, 0.50, 1.0]        # the green from the April step indicator
+GRID_ON = [0.765, 1.0, 0.616, 1.0]      # April's matrixctrl cell colour
+GRID_OFF = [0.204, 0.204, 0.204, 1.0]   # April's element colour
+DIM = [0.42, 0.42, 0.42, 1.0]
+FG = [0.91, 0.91, 0.91, 1.0]
+
+
+def present(bid, x, y, w, h):
+    """Place an existing box in presentation view."""
+    for e in _boxes:
+        if e["box"]["id"] == bid:
+            e["box"]["presentation"] = 1
+            e["box"]["presentation_rect"] = [x, y, w, h]
+            return True
+    return False
+
+
+def plabel(bid, x, y, text, w=120, size=11, col=None, face=0):
+    """A comment that exists only in presentation."""
+    box(bid, "comment", -900, -900, w, 15, text,
+        presentation=1, presentation_rect=[x, y, w, 15],
+        textcolor=col or DIM, fontsize=size, fontface=face, no=0)
+
+
+def prect(bid, x, y, w, h, col=None):
+    """A hairline separator. Borders, never filled blocks."""
+    box(bid, "panel", -900, -900, w, h,
+        presentation=1, presentation_rect=[x, y, w, h],
+        bgfillcolor_type="color", bgfillcolor_color=col or [0, 0, 0, 0],
+        border=1, bordercolor=[1, 1, 1, 0.07], rounded=0, no=0, ni=1)
+
+
+def build_presentation():
+    M = 30                                   # margin
+    # ── Header ────────────────────────────────────────────────────
+    plabel("p-title", M, 24, "Maud", w=200, size=26, col=FG)
+    plabel("p-sub", M, 58, "Six-voice polymetric groovebox", w=240, size=11)
+
+    x = 300
+    plabel("p-bpm-l", x, 28, "Tempo", w=60)
+    present("tr-bpm", x, 47, 60, 22)
+    present("tr-div", x + 74, 47, 66, 22)
+    plabel("p-div-l", x + 74, 28, "Division", w=60)
+    plabel("p-play-l", x + 160, 28, "Play", w=40)
+    present("tr-play", x + 160, 46, 26, 26)
+
+    # Timing, the numbers that say whether the clock is holding.
+    tx = x + 230
+    plabel("p-t-l", tx, 28, "Step / best / worst, ms", w=180)
+    present("tr-tnow", tx, 47, 62, 22)
+    present("tr-tbest", tx + 68, 47, 62, 22)
+    present("tr-tworst", tx + 136, 47, 62, 22)
+
+    # Sequencer source, and audio.
+    sx = tx + 240
+    plabel("p-nq-l", sx, 28, "Native sequencer", w=120)
+    present("nq-sw", sx, 46, 26, 26)
+    plabel("p-au-l", sx + 120, 28, "Audio", w=60)
+    present("out-at", sx + 120, 46, 26, 26)
+
+    prect("p-r1", M, 88, PW - 2 * M, 1)
+
+    # ── Sequencer ─────────────────────────────────────────────────
+    gy = 128
+    plabel("p-seq-l", M, 104, "Sequencer", w=200, size=13, col=FG)
+    present("sq-ind", M + 92, gy, 780, 10)
+    present("sq-grid", M + 92, gy + 16, 780, 150)
+    for i, v in enumerate(VOICES):
+        plabel(f"p-vn-{i}", M, gy + 22 + i * 25, v["name"], w=86, size=11,
+               col=FG)
+        present(f"len-{i}", M + 884, gy + 18 + i * 25, 56, 20)
+    plabel("p-len-l", M + 884, gy - 2, "Length", w=60)
+
+    prect("p-r2", M, gy + 184, PW - 2 * M, 1)
+
+    # ── Voice ─────────────────────────────────────────────────────
+    vy = gy + 206
+    plabel("p-v-l", M, vy - 24, "Voice", w=200, size=13, col=FG)
+    present("vc-tab", M, vy, 300, 26)
+    DIALS = ["STRESS", "BLOOM", "SCAR", "WEIGHT", "MIST", "HEAT", "DRIFT",
+             "DENSITY", "PITCH", "DECAY", "EXCITER", "BODY", "PAN"]
+    for j, name in enumerate(DIALS):
+        col, row = j % 7, j // 7
+        dx = M + col * 96
+        dy = vy + 44 + row * 82
+        present(f"dd-{j}", dx, dy, 46, 46)
+        plabel(f"p-dl-{j}", dx - 6, dy + 48, name.capitalize(), w=60, size=10)
+
+    prect("p-r3", M, vy + 216, PW - 2 * M, 1)
+
+    # ── Mixer ─────────────────────────────────────────────────────
+    my = vy + 238
+    plabel("p-mx-l", M, my - 24, "Mixer", w=200, size=13, col=FG)
+    for i, v in enumerate(VOICES):
+        mx = M + i * 96
+        present(f"vlf-{i}", mx, my, 56, 22)
+        plabel(f"p-ml-{i}", mx, my + 24, v["name"], w=80, size=10)
+    present("mx-gain", M + 620, my - 4, 300, 30)
+    plabel("p-gain-l", M + 620, my - 22, "Master", w=80)
+    present("mx-meter", M + 620, my + 32, 300, 12)
+
+    # Colours, lifted from the April hand-edits so they survive regeneration.
+    for e in _boxes:
+        b = e["box"]
+        if b["id"] == "sq-grid":
+            b["bgcolor"] = [0, 0, 0, 0]
+            b["color"] = GRID_ON
+            b["elementcolor"] = GRID_OFF
+        elif b["id"] == "sq-ind":
+            b["slidercolor"] = ACCENT
 
 
 if __name__ == "__main__":
