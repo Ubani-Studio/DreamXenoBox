@@ -5474,6 +5474,21 @@
 			},
 			{
 				"box": {
+					"id": "mx-gain-init",
+					"maxclass": "message",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						130,
+						965,
+						40,
+						22
+					],
+					"text": "100"
+				}
+			},
+			{
+				"box": {
 					"id": "mx-mulL",
 					"maxclass": "newobj",
 					"numinlets": 2,
@@ -5523,7 +5538,7 @@
 					"outlettype": [
 						"signal"
 					],
-					"text": "clip~ -1. 1."
+					"text": "clip~ -0.891 0.891"
 				}
 			},
 			{
@@ -5541,7 +5556,7 @@
 					"outlettype": [
 						"signal"
 					],
-					"text": "clip~ -1. 1."
+					"text": "clip~ -0.891 0.891"
 				}
 			},
 			{
@@ -5758,6 +5773,36 @@
 						26,
 						26
 					]
+				}
+			},
+			{
+				"box": {
+					"id": "out-adel",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						240,
+						1076,
+						80,
+						22
+					],
+					"text": "delay 500"
+				}
+			},
+			{
+				"box": {
+					"id": "out-aon",
+					"maxclass": "message",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						330,
+						1076,
+						30,
+						22
+					],
+					"text": "1"
 				}
 			},
 			{
@@ -17448,6 +17493,30 @@
 			{
 				"patchline": {
 					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"mx-gain-init",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"mx-gain-init",
+						0
+					],
+					"destination": [
+						"mx-gain",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"mx-l-4",
 						0
 					],
@@ -17705,6 +17774,42 @@
 					],
 					"destination": [
 						"mx-rec",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"tr-lb",
+						0
+					],
+					"destination": [
+						"out-adel",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"out-adel",
+						0
+					],
+					"destination": [
+						"out-aon",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"out-aon",
+						0
+					],
+					"destination": [
+						"out-at",
 						0
 					]
 				}

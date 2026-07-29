@@ -778,6 +778,11 @@ def build():
         ni=1, no=2, ot=["signal", ""],
         parameter_enable=0, orientation=1)
     wire("mx-sig1", 0, "mx-gain", 0)
+    # gain~ is 0..157 with unity at 100. Set it at load so the master starts in
+    # a known place every time rather than wherever it was left.
+    box("mx-gain-init", "message", 130, add_y + 4, 40, 22, "100")
+    wire("tr-lb", 0, "mx-gain-init", 0)
+    wire("mx-gain-init", 0, "mx-gain", 0)
 
     # L master multiply
     box("mx-mulL", "newobj", 75, add_y + 66, 40, 22,
@@ -793,9 +798,9 @@ def build():
 
     # Master limiter (soft clip before DAC)
     lim_y = add_y + 93
-    box("mx-limL", "newobj", 75, lim_y, 70, 22, "clip~ -1. 1.",
+    box("mx-limL", "newobj", 75, lim_y, 70, 22, "clip~ -0.891 0.891",
         ni=1, ot=["signal"])
-    box("mx-limR", "newobj", 550, lim_y, 70, 22, "clip~ -1. 1.",
+    box("mx-limR", "newobj", 550, lim_y, 70, 22, "clip~ -0.891 0.891",
         ni=1, ot=["signal"])
     wire("mx-mulL", 0, "mx-limL", 0)
     wire("mx-mulR", 0, "mx-limR", 0)
@@ -860,8 +865,16 @@ def build():
     wire("mx-recdel", 0, "mx-recoff", 0)
     wire("mx-recoff", 0, "mx-rec", 0)
 
-    # Audio toggle
+    # Audio toggle, switched on at load. Requested: everything ready so the
+    # only remaining action is PLAY. delay 500 lets the rest of the loadbang
+    # chain settle before DSP starts, otherwise the first buffer can carry
+    # whatever the voices were mid-initialisation.
     box("out-at", "toggle", 165, dac_y - 2, 25, 25, ot=["int"])
+    box("out-adel", "newobj", 240, dac_y - 30, 80, 22, "delay 500")
+    wire("tr-lb", 0, "out-adel", 0)
+    box("out-aon", "message", 330, dac_y - 30, 30, 22, "1")
+    wire("out-adel", 0, "out-aon", 0)
+    wire("out-aon", 0, "out-at", 0)
     comment("out-al", 195, dac_y, "AUDIO ON/OFF", fontface=1, w=90)
     box("out-as", "newobj", 165, dac_y + 30, 45, 22,
         "sel 0 1", no=3, ot=["bang", "bang", ""])
