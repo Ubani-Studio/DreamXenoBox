@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate DreamXenoBox.maxpat — 6-voice polymetric sequencer groovebox.
+"""Generate Maud.maxpat — 6-voice polymetric sequencer groovebox.
 
 Layout: 15px grid, top-to-bottom flow, send/receive for cross-section routing.
 """
@@ -18,6 +18,17 @@ Param mist(0.2);
 Param heat_macro(0.3);
 Param drift_param(0);
 Param density_param(0.5);
+Param flam_pitch_off(0);
+Param flam_vel(1);
+Param flam_pitch_gate(0);
+Param lfo_pitch_off(0);
+Param lfo_stress_off(0);
+Param lfo_bloom_off(0);
+Param lfo_decay_off(0);
+Param lfo_mist_off(0);
+Param lfo_heat_off(0);
+Param lfo_drift_off(0);
+Param lfo_density_off(0);
 
 History prev_trig(0);
 History pressure(0);
@@ -42,11 +53,14 @@ History pitch_env(0);
 History fb_state(0);
 History fb_hp(0);
 History cav_lp(0);
+History fb_lfo_phase(0);
+History fb_lp2(0);
+History flam_p_env(0);
 Delay comb_d(8820);
 Delay cav_d(8820);
 
 trig_on = (in1 > 0.5) * (prev_trig <= 0.5);
-vel = in1;
+vel = in1 * flam_vel;
 prev_trig = in1;
 
 if (trig_on) {
@@ -56,6 +70,7 @@ if (trig_on) {
     halo_env = vel * mist;
     main_env = vel;
     pitch_env = vel;
+    flam_p_env = flam_pitch_off;
 }
 
 p_decay = 0.00002 + (1 - stress) * 0.00008;
@@ -65,53 +80,70 @@ heat_state = heat_state * (1 - 0.00005);
 fatigue = fatigue * (1 - 0.000002);
 stiffness = fatigue * 0.6 + pressure * 0.4;
 
-eff_heat = clamp(heat_macro + heat_state * 0.5, 0, 1);
-eff_scar = clamp(scar + pressure * stress, 0, 1);
+eff_stress = clamp(stress + lfo_stress_off, 0, 1);
+eff_bloom = clamp(bloom + lfo_bloom_off, 0, 1);
+eff_mist = clamp(mist + lfo_mist_off, 0, 1);
+eff_heat = clamp(heat_macro + lfo_heat_off + heat_state * 0.5, 0, 1);
+eff_drift = clamp(drift_param + lfo_drift_off, 0, 1);
+eff_density = clamp(density_param + lfo_density_off, 0, 1);
+eff_decay_ms = clamp(decay_ms + lfo_decay_off, 5, 80);
+eff_scar = clamp(scar + pressure * eff_stress, 0, 1);
+
+fp_rate = exp(-(flam_pitch_gate * 8)) * 0.15;
+flam_p_env = flam_p_env * (1 - fp_rate);
 
 p_env_rate = 0.002 + weight * 0.008;
 pitch_env = pitch_env * (1 - p_env_rate);
 p_sweep = pitch_env * weight * 24;
-p_mod = pitch + p_sweep + noise() * pressure * drift_param * 2;
+p_mod = pitch + lfo_pitch_off + flam_p_env + p_sweep + noise() * pressure * eff_drift * 2;
 base_freq = mtof(clamp(p_mod, 10, 130));
-w_scale = 1 - weight * 0.8;
-body_freq = base_freq * w_scale;
+w_scale = 1 - weight * 0.35;
+body_freq = max(base_freq * w_scale, 25);
 
-e_decay = 0.001 + density_param * 0.003;
+e_decay = 0.0005 + eff_density * 0.003;
 exc_env = exc_env * (1 - e_decay);
 
 exciter_out = 0;
 if (exciter_type < 0.5) {
-    fm_r = 1.41 + eff_heat * 2;
+    fm_r = 1.41 + eff_heat * 3;
     mf = base_freq * fm_r;
-    fm_idx = (8 + eff_heat * 12) * exc_env;
+    fm_idx = (12 + eff_heat * 18) * exc_env;
     exc_mod_phase = wrap(exc_mod_phase + mf / samplerate, 0, 1);
     mod_sig = sin(exc_mod_phase * twopi) * fm_idx;
     exc_car_phase = wrap(exc_car_phase + base_freq / samplerate, 0, 1);
-    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env;
+    exciter_out = sin(exc_car_phase * twopi + mod_sig) * exc_env * 1.5;
 } else {
     n = noise();
-    cutoff = base_freq * (2 + eff_heat * 8);
+    cutoff = base_freq * (3 + eff_heat * 12);
     coeff = clamp(1 - exp(-twopi * cutoff / samplerate), 0.001, 0.999);
     noise_filt = noise_filt + (n - noise_filt) * coeff;
-    exciter_out = noise_filt * 4 * exc_env;
+    exciter_out = noise_filt * 6 * exc_env;
 }
 
-fb_gain = mist * (0.5 + stress * 0.5);
+fb_lfo_rate = 0.3 + (1 - eff_bloom) * 7.7;
+fb_lfo_depth_raw = clamp((eff_mist - 0.3) / 0.7, 0, 1);
+fb_lfo_phase = wrap(fb_lfo_phase + fb_lfo_rate / samplerate, 0, 1);
+fb_lfo = sin(fb_lfo_phase * twopi);
+fb_gain = eff_mist * (0.5 + eff_stress * 0.5) * (1 + fb_lfo * fb_lfo_depth_raw * 0.15);
 fb_gain = clamp(fb_gain, 0, 0.95);
-hp_cut = 200 + (1 - weight) * 800;
+hp_cut_base = 80 + (1 - weight) * 2400;
+hp_cut = hp_cut_base * (1 + fb_lfo * fb_lfo_depth_raw * 0.7);
 hp_c = clamp(1 - exp(-twopi * hp_cut / samplerate), 0.001, 0.999);
 fb_lp = fb_hp + (fb_state - fb_hp) * hp_c;
 fb_hp = fb_lp;
 fb_hpf = fb_state - fb_lp;
-fb_ltd = tanh(fb_hpf * 2) * 0.5;
-bl_rate = 0.000001 + (1 - bloom) * 0.0003;
+lp2_cut = 800 + eff_bloom * 10000 + fb_lfo * fb_lfo_depth_raw * 3000;
+lp2_c = clamp(1 - exp(-twopi * lp2_cut / samplerate), 0.001, 0.999);
+fb_lp2 = fb_lp2 + (fb_hpf - fb_lp2) * lp2_c;
+fb_ltd = tanh(fb_lp2 * 2.5) * 0.6;
+bl_rate = 0.000001 + (1 - eff_bloom) * 0.0003;
 halo_env = halo_env * (1 - bl_rate);
 fb_sig = fb_ltd * fb_gain * halo_env;
 body_input = exciter_out + fb_sig;
 
-eff_decay = decay_ms * decay_ms * 2.5;
+eff_decay = eff_decay_ms * eff_decay_ms * 2.5;
 decay_norm = clamp(eff_decay / 16000, 0, 1);
-eff_Q = clamp(0.98 + decay_norm * 0.018 - fatigue * 0.3, 0.8, 0.9998);
+eff_Q = clamp(0.985 + decay_norm * 0.014 - fatigue * 0.15, 0.85, 0.9995);
 
 body_out = 0;
 if (body_type < 0.5) {
@@ -119,62 +151,62 @@ if (body_type < 0.5) {
     r1 = eff_Q;
     ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
     ry2_a = ry1_a; ry1_a = ya;
-    w2 = twopi * body_freq * (1.347 + stiffness * 0.15) / samplerate;
-    r2 = eff_Q * 0.99;
+    w2 = twopi * body_freq * (1.347 + stiffness * 0.2) / samplerate;
+    r2 = eff_Q * 0.995;
     yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;
     ry2_b = ry1_b; ry1_b = yb;
-    w3 = twopi * body_freq * (1.891 + stiffness * 0.2) / samplerate;
-    r3 = eff_Q * 0.98;
+    w3 = twopi * body_freq * (1.891 + stiffness * 0.25) / samplerate;
+    r3 = eff_Q * 0.99;
     yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;
     ry2_c = ry1_c; ry1_c = yc;
-    w4 = twopi * body_freq * (2.534 + stiffness * 0.3) / samplerate;
-    r4 = eff_Q * 0.97;
+    w4 = twopi * body_freq * (2.534 + stiffness * 0.35) / samplerate;
+    r4 = eff_Q * 0.985;
     yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
     ry2_d = ry1_d; ry1_d = yd;
-    body_out = (ya + yb * 0.7 + yc * 0.45 + yd * 0.3) * 0.25;
+    body_out = (ya + yb * 0.8 + yc * 0.55 + yd * 0.4) * 0.35;
 } else if (body_type < 1.5) {
     d_samps = clamp(samplerate / base_freq, 2, 8000);
-    fb = eff_Q * 0.9;
+    fb = eff_Q * 0.92;
     delayed = comb_d.read(d_samps);
-    d_coeff = 0.3 + fatigue * 0.4;
+    d_coeff = 0.25 + fatigue * 0.35;
     comb_lp = comb_lp + (delayed - comb_lp) * d_coeff;
     comb_d.write(body_input + comb_lp * fb);
-    body_out = delayed;
+    body_out = delayed * 1.3;
 } else if (body_type < 2.5) {
     cav_len = clamp(samplerate / base_freq, 2, 8000);
-    cav_fb = eff_Q * (0.85 + pressure * 0.1);
-    cav_fb = clamp(cav_fb, 0, 0.995);
+    cav_fb = eff_Q * (0.88 + pressure * 0.1);
+    cav_fb = clamp(cav_fb, 0, 0.996);
     cav_del = cav_d.read(cav_len);
-    cav_cut = 0.2 + (1 - pressure) * 0.3 + eff_heat * 0.3;
+    cav_cut = 0.15 + (1 - pressure) * 0.35 + eff_heat * 0.3;
     cav_lp = cav_lp + (cav_del - cav_lp) * cav_cut;
     cav_d.write(body_input + cav_lp * cav_fb);
     w1 = twopi * body_freq * 1.0 / samplerate;
-    r1 = eff_Q * 0.95;
+    r1 = eff_Q * 0.97;
     ya = cav_del + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
     ry2_a = ry1_a; ry1_a = ya;
-    body_out = (cav_del * 0.4 + ya * 0.6);
+    body_out = (cav_del * 0.35 + ya * 0.65) * 1.2;
 } else {
     mem_r1 = 1.0;
     mem_r2 = 1.594;
     mem_r3 = 2.136;
     mem_r4 = 2.296;
     w1 = twopi * body_freq * mem_r1 / samplerate;
-    r1 = eff_Q * 0.998;
+    r1 = eff_Q * 0.999;
     ya = body_input + 2 * r1 * cos(w1) * ry1_a - r1 * r1 * ry2_a;
     ry2_a = ry1_a; ry1_a = ya;
     w2 = twopi * body_freq * mem_r2 / samplerate;
-    r2 = eff_Q * 0.99;
+    r2 = eff_Q * 0.995;
     yb = body_input + 2 * r2 * cos(w2) * ry1_b - r2 * r2 * ry2_b;
     ry2_b = ry1_b; ry1_b = yb;
     w3 = twopi * body_freq * mem_r3 / samplerate;
-    r3 = eff_Q * 0.985;
+    r3 = eff_Q * 0.99;
     yc = body_input + 2 * r3 * cos(w3) * ry1_c - r3 * r3 * ry2_c;
     ry2_c = ry1_c; ry1_c = yc;
     w4 = twopi * body_freq * mem_r4 / samplerate;
-    r4 = eff_Q * 0.98;
+    r4 = eff_Q * 0.985;
     yd = body_input + 2 * r4 * cos(w4) * ry1_d - r4 * r4 * ry2_d;
     ry2_d = ry1_d; ry1_d = yd;
-    body_out = (ya * 0.5 + yb * 0.25 + yc * 0.15 + yd * 0.1);
+    body_out = (ya * 0.55 + yb * 0.3 + yc * 0.2 + yd * 0.15) * 1.1;
 }
 
 fold_d = 1 + eff_scar * 4;
@@ -185,29 +217,30 @@ if (eff_scar > 0.01) {
     fractured = body_out * (1 - eff_scar) + folded * eff_scar;
 }
 
-fb_source = body_out * (1 - stress) + fractured * stress;
+fb_source = body_out * (1 - eff_stress) + fractured * eff_stress;
 fb_state = fb_source;
 
 env_rate = 1.0 / max(eff_decay * samplerate / 1000, 1);
 main_env = main_env * (1 - env_rate);
 
-bl_env = halo_env * mist;
+bl_env = halo_env * eff_mist;
 out_env = max(main_env, bl_env);
-out1 = fractured * out_env;""".strip()
+raw_out = fractured * out_env * 3;
+out1 = tanh(raw_out) * 0.95;""".strip()
 
 # ── Voice definitions ──
 VOICES = [
-    {"name": "MASS",  "idx": 0, "color": [0.9, 0.2, 0.2, 1.0], "level": 0.5,
+    {"name": "MASS",  "idx": 0, "color": [0.9, 0.2, 0.2, 1.0], "level": 0.85,
      "midi_note": 36, "pattern": [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0]},
-    {"name": "VEIN",  "idx": 1, "color": [0.8, 0.5, 0.1, 1.0], "level": 0.3,
+    {"name": "VEIN",  "idx": 1, "color": [0.8, 0.5, 0.1, 1.0], "level": 0.7,
      "midi_note": 38, "pattern": [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0]},
-    {"name": "SHARD", "idx": 2, "color": [0.2, 0.7, 0.9, 1.0], "level": 0.25,
+    {"name": "SHARD", "idx": 2, "color": [0.2, 0.7, 0.9, 1.0], "level": 0.6,
      "midi_note": 40, "pattern": [1,0,1,1, 0,0,1,0, 1,0,1,1, 0,0,1,0]},
-    {"name": "HUSK",  "idx": 3, "color": [0.6, 0.5, 0.3, 1.0], "level": 0.3,
+    {"name": "HUSK",  "idx": 3, "color": [0.6, 0.5, 0.3, 1.0], "level": 0.65,
      "midi_note": 41, "pattern": [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0]},
-    {"name": "FAULT", "idx": 4, "color": [0.5, 0.1, 0.6, 1.0], "level": 0.35,
+    {"name": "FAULT", "idx": 4, "color": [0.5, 0.1, 0.6, 1.0], "level": 0.75,
      "midi_note": 43, "pattern": [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0]},
-    {"name": "HALO",  "idx": 5, "color": [0.3, 0.8, 0.5, 1.0], "level": 0.2,
+    {"name": "HALO",  "idx": 5, "color": [0.3, 0.8, 0.5, 1.0], "level": 0.55,
      "midi_note": 45, "pattern": [0,0,0,1, 0,0,0,0, 0,0,0,1, 0,0,0,0]},
 ]
 
@@ -220,17 +253,19 @@ MACRO_LABELS = ["STRESS", "BLOOM", "SCAR", "WEIGHT", "MIST", "HEAT", "DRIFT", "D
 COL_SPACING = 150
 VOICE_COLS = [75 + i * COL_SPACING for i in range(6)]  # 75, 225, 375, 525, 675, 825
 
-# Section Y positions
+# Section Y positions (each section gets 25px gap to next)
 Y_TITLE     = 15
-Y_TRANSPORT = 45
-Y_SEQ       = 120
-Y_SEQ_JS    = 285
-Y_VOICES    = 330
-Y_MIXER     = 510
-Y_EDITOR    = 660
-Y_FLAM      = 870
-Y_KITS      = 1020
-Y_MIDI      = 1125
+Y_TRANSPORT = 55
+Y_SEQ       = 300
+Y_SEQ_JS    = 470
+Y_VOICES    = 560
+Y_MIXER     = 780
+Y_EDITOR    = 1160
+Y_FLAM      = 1445
+Y_GROOVE    = 1830
+Y_LFO       = 2010
+Y_KITS      = 2420
+Y_MIDI      = 2670
 
 # Grid dimensions
 GRID_X = 75
@@ -309,38 +344,109 @@ def build():
     _lines.clear()
 
     # ═══════════════════════ TITLE ═══════════════════════
-    comment("title", 30, Y_TITLE, "DREAM XENO BOX",
+    comment("title", 30, Y_TITLE, "MAUD",
             w=300, fontsize=18.0, fontface=1)
 
-    # ═══════════════════════ TRANSPORT ═══════════════════════
+    # ═══════════════════════ TRANSPORT (audio-rate clock) ═══════════════════════
     section_header("sec-tr", 30, Y_TRANSPORT, "TRANSPORT")
 
     ty = Y_TRANSPORT + 30  # 75
 
+    # ── Loadbang + Overdrive ──
     box("tr-lb", "newobj", 30, ty, 58, 22, "loadbang", ot=["bang"])
+    box("tr-od", "message", 30, ty + 30, 340, 22,
+        ";max overdrive 1 \\; max sched_overdrive 1", ni=2, ot=[""])
+    wire("tr-lb", 0, "tr-od", 0)
+
+    # ── BPM control ──
     box("tr-bpmi", "message", 105, ty, 32, 22, "120", ni=2, ot=[""])
     box("tr-bpm", "number", 150, ty, 50, 22, no=2, ot=["", "bang"],
         minimum=30, maximum=300)
     comment("tr-bl", 210, ty, "BPM", w=30)
-    box("tr-calc", "newobj", 255, ty, 135, 22,
-        "expr 60000. / ($f1 * 4.)", ot=[""])
-
-    # Play toggle + metro + counter
-    box("tr-play", "toggle", 435, ty - 4, 28, 28, ot=["int"])
-    comment("tr-pl", 470, ty, "PLAY", fontface=1, w=40)
-    box("tr-metro", "newobj", 435, ty + 30, 65, 22, "metro 125", ot=["bang"])
-    box("tr-cnt", "newobj", 435, ty + 60, 110, 22, "counter 0 255",
-        no=4, ot=["int", "", "", "int"])
-    comment("tr-sl", 570, ty + 60, "STEP", w=40)
-    box("tr-sn", "number", 615, ty + 60, 45, 22, no=2, ot=["", "bang"])
-
     wire("tr-lb", 0, "tr-bpmi", 0)
     wire("tr-bpmi", 0, "tr-bpm", 0)
-    wire("tr-bpm", 0, "tr-calc", 0)
-    wire("tr-calc", 0, "tr-metro", 1)
-    wire("tr-play", 0, "tr-metro", 0)
-    wire("tr-metro", 0, "tr-cnt", 0)
+
+    # ── Division selector (triplets + double-time) ──
+    # 0=1/16(4ppb) 1=1/8(2ppb) 2=1/8T(3ppb) 3=1/16T(6ppb) 4=1/32(8ppb)
+    box("tr-div", "umenu", 255, ty, 55, 20, no=2, ot=["int", ""],
+        items=["1/16", ",", "1/8", ",", "1/8T", ",", "1/16T", ",", "1/32"])
+    comment("tr-div-l", 315, ty, "DIV", w=30)
+    # Ratio lookup: coll stores float multipliers
+    box("tr-div-coll", "newobj", 255, ty + 60, 65, 22,
+        "coll", no=2, ot=["", ""])
+    box("tr-div-load", "message", 255, ty + 30, 280, 22,
+        "store 0 1., store 1 0.5, store 2 0.75, store 3 1.5, store 4 2.",
+        ni=2, ot=[""])
+    box("tr-div-init", "message", 540, ty + 30, 18, 22, "0", ni=2, ot=[""])
+    wire("tr-lb", 0, "tr-div-load", 0)
+    wire("tr-div-load", 0, "tr-div-coll", 0)
+    wire("tr-lb", 0, "tr-div-init", 0)
+    wire("tr-div-init", 0, "tr-div", 0)
+    wire("tr-div", 0, "tr-div-coll", 0)
+    # Ordering trigger: when division changes, update ms then retrigger BPM
+    box("tr-div-t", "newobj", 255, ty + 90, 35, 22,
+        "t b f", ni=1, no=2, ot=["bang", "float"])
+    wire("tr-div-coll", 0, "tr-div-t", 0)
+    wire("tr-div-t", 0, "tr-bpm", 0)  # bang BPM to retrigger (fires second)
+
+    # ── Audio clock chain ──
+    # BPM/60*4 = base Hz (1/16th notes), then * ratio for division
+    box("tr-hz", "newobj", 450, ty + 30, 120, 22,
+        "expr $f1 / 60. * 4.", ot=["float"])
+    wire("tr-bpm", 0, "tr-hz", 0)
+    box("tr-sig", "newobj", 450, ty + 60, 35, 22, "sig~", ot=["signal"])
+    wire("tr-hz", 0, "tr-sig", 0)
+    # Ratio signal
+    box("tr-rsig", "newobj", 510, ty + 60, 35, 22, "sig~", ot=["signal"])
+    box("tr-rsig-def", "newobj", 510, ty + 30, 75, 22,
+        "loadmess 1.", ot=["float"])
+    wire("tr-rsig-def", 0, "tr-rsig", 0)
+    wire("tr-div-coll", 0, "tr-rsig", 0)
+    # Hz * ratio → phasor~
+    box("tr-mult", "newobj", 450, ty + 90, 35, 22, "*~",
+        ni=2, ot=["signal"])
+    wire("tr-sig", 0, "tr-mult", 0)
+    wire("tr-rsig", 0, "tr-mult", 1)
+    box("tr-phasor", "newobj", 450, ty + 120, 55, 22,
+        "phasor~", ot=["signal"])
+    wire("tr-mult", 0, "tr-phasor", 0)
+    # Detect ramp wrap: delta → threshold → edge
+    box("tr-delta", "newobj", 530, ty + 120, 45, 22,
+        "delta~", ot=["signal"])
+    wire("tr-phasor", 0, "tr-delta", 0)
+    box("tr-lt", "newobj", 590, ty + 120, 35, 22, "<~ 0",
+        ni=2, ot=["signal"])
+    wire("tr-delta", 0, "tr-lt", 0)
+    box("tr-edge", "newobj", 640, ty + 120, 45, 22, "edge~",
+        no=2, ot=["bang", "bang"])
+    wire("tr-lt", 0, "tr-edge", 0)
+
+    # ── Play toggle + gate + counter ──
+    box("tr-play", "toggle", 730, ty - 4, 28, 28, ot=["int"])
+    comment("tr-pl", 765, ty, "PLAY", fontface=1, w=40)
+    box("tr-gate", "newobj", 730, ty + 120, 50, 22, "gate",
+        ni=2, ot=[""])
+    wire("tr-edge", 0, "tr-gate", 1)
+    wire("tr-play", 0, "tr-gate", 0)
+    # Wrap on a multiple of lcm(4,8,12,16,24,32) = 96. The old 0..255 wrapped
+    # after 256, and 256 % 12 = 4 and 256 % 24 = 16, so every 12- and 24-step
+    # pattern jumped mid-phrase on each rollover. 288 is the smallest safe
+    # value at or above the original range.
+    box("tr-cnt", "newobj", 800, ty + 120, 110, 22, "counter 0 287",
+        no=4, ot=["int", "", "", "int"])
+    wire("tr-gate", 0, "tr-cnt", 0)
+    comment("tr-sl", 920, ty + 120, "STEP", w=40)
+    box("tr-sn", "number", 965, ty + 120, 45, 22, no=2, ot=["", "bang"])
     wire("tr-cnt", 0, "tr-sn", 0)
+
+    # ── Step duration ms (for flam engine) ──
+    box("tr-ms", "newobj", 600, ty + 90, 155, 22,
+        "expr 60000. / ($f1 * 4. * $f2)", ni=2, ot=["float"])
+    wire("tr-bpm", 0, "tr-ms", 0)
+    wire("tr-div-t", 1, "tr-ms", 1)  # ratio → inlet 1 (fires first)
+    box("tr-ms-def", "newobj", 770, ty + 90, 75, 22,
+        "loadmess 1.", ot=["float"])
+    wire("tr-ms-def", 0, "tr-ms", 1)
 
     # ═══════════════════════ SEQUENCER ═══════════════════════
     section_header("sec-sq", 30, Y_SEQ - 15, "SEQUENCER")
@@ -349,6 +455,14 @@ def build():
     for i, v in enumerate(VOICES):
         row_y = Y_SEQ + i * (GRID_H // GRID_ROWS) + 2
         comment(f"rl-{i}", 15, row_y, v["name"], fontface=1, fontsize=11.0, w=55)
+
+    # Step position indicator (multislider above grid)
+    box("sq-ind", "multislider", GRID_X, Y_SEQ - 18, GRID_W, 15,
+        ni=1, no=1, ot=["list"],
+        setstyle=0, size=GRID_COLS, setminmax=[0.0, 1.0],
+        slidercolor=[0.3, 0.8, 0.5, 1.0],
+        candicane2=[0.15, 0.15, 0.15, 1.0],
+        parameter_enable=0)
 
     # matrixctrl grid
     box("sq-grid", "matrixctrl", GRID_X, Y_SEQ, GRID_W, GRID_H,
@@ -380,9 +494,15 @@ def build():
     # JS x = 75, so outlet[i] at 75 + i * W/6 = 75 + i*150 → W/6 = 150 → W = 900
     js_w = 900
     box("sq-js", "newobj", GRID_X, Y_SEQ_JS, js_w, 22,
-        "js sequencer.js", ni=2, no=7, ot=["", "", "", "", "", "", ""])
+        "js sequencer.js", ni=2, no=8, ot=["", "", "", "", "", "", "", ""])
     wire("tr-cnt", 0, "sq-js", 0)
     wire("sq-grid", 0, "sq-js", 1)
+    # Never let a UI redraw share a call with a trigger. qlim defers the
+    # indicator to the low-priority queue and throttles it to ~30fps; the
+    # drums are already out of the outlet by the time it repaints.
+    box("sq-qlim", "newobj", GRID_X + js_w + 15, Y_SEQ_JS, 70, 22, "qlim 33")
+    wire("sq-js", 7, "sq-qlim", 0)
+    wire("sq-qlim", 0, "sq-ind", 0)
 
     # Init matrixctrl with default patterns
     init_parts = []
@@ -427,7 +547,7 @@ def build():
         # Level control: flonum + receive for kit restore
         box(f"vlf-{i}", "flonum", cx + 45, Y_VOICES + 112, 45, 22,
             no=2, ot=["float", "bang"],
-            minimum=0.0, maximum=1.0, numdecimalplaces=2)
+            minimum=0.0, maximum=2.0, numdecimalplaces=2)
         box(f"vlr-{i}", "newobj", cx + 95, Y_VOICES + 112, 85, 22,
             f"receive v{i}_level", ot=[""])
         box(f"vls-{i}", "message", cx + 95, Y_VOICES + 135, 50, 22,
@@ -450,8 +570,8 @@ def build():
         box(f"vs-{i}", "newobj", cx, Y_VOICES + 160, 80, 22,
             f"send~ v{i}_out", ni=1, no=0)
 
-        # Wiring: JS outlet → click~ → gen~ → *~ → send~
-        wire("sq-js", i, f"vc-{i}", 0)
+        # Wiring: flam engine → send v{i}_trig → receive → click~ → gen~ → *~ → send~
+        # (direct sequencer→click~ wire removed — all triggers go through flam engine)
         wire(f"vb-{i}", 0, f"vc-{i}", 0)
         wire(f"vc-{i}", 0, f"vg-{i}", 0)
         wire(f"vr-{i}", 0, f"vg-{i}", 0)   # params → gen~
@@ -464,47 +584,115 @@ def build():
         wire(f"vlf-{i}", 0, f"vlk-{i}", 0)
         wire(f"vlk-{i}", 0, "km-js", 0)
 
-    # ═══════════════════════ MIXER ═══════════════════════
+    # ═══════════════════════ MIXER (STEREO) ═══════════════════════
     section_header("sec-mx", 30, Y_MIXER - 15, "MIXER")
 
-    # receive~ from each voice
+    # Per-voice: receive~ → pan (base + LFO offset) → pan split (L/R *~) via equal-power pan law
     for i in range(6):
         rx = 75 + i * 120
+        # Mono receive from voice
         box(f"mr-{i}", "newobj", rx, Y_MIXER, 95, 22,
             f"receive~ v{i}_out", ot=["signal"])
+        # Pan receive (message domain, from voicectrl via messnamed)
+        box(f"mp-rcv-{i}", "newobj", rx, Y_MIXER + 22, 85, 22,
+            f"receive v{i}_pan", ot=[""])
+        # LFO pan offset receive
+        box(f"mp-lfo-{i}", "newobj", rx, Y_MIXER + 44, 95, 22,
+            f"receive v{i}_pan_lfo", ot=[""])
+        # Sum base pan + LFO offset
+        box(f"mp-sum-{i}", "newobj", rx, Y_MIXER + 66, 55, 22,
+            "+ 0.", ni=2, ot=["float"])
+        wire(f"mp-rcv-{i}", 0, f"mp-sum-{i}", 0)
+        wire(f"mp-lfo-{i}", 0, f"mp-sum-{i}", 1)
+        # Clip to 0-1
+        box(f"mp-clip-{i}", "newobj", rx, Y_MIXER + 88, 75, 22,
+            "clip 0. 1.", ot=["float"])
+        wire(f"mp-sum-{i}", 0, f"mp-clip-{i}", 0)
+        # Equal-power pan: L = sqrt(1 - pan), R = sqrt(pan)
+        box(f"mp-cos-{i}", "newobj", rx, Y_MIXER + 110, 95, 22,
+            "expr sqrt(1. - $f1)", ot=["float"])
+        box(f"mp-sin-{i}", "newobj", rx, Y_MIXER + 132, 75, 22,
+            "expr sqrt($f1)", ot=["float"])
+        wire(f"mp-clip-{i}", 0, f"mp-cos-{i}", 0)
+        wire(f"mp-clip-{i}", 0, f"mp-sin-{i}", 0)
+        # L channel *~ (audio × pan_L gain)
+        box(f"mp-l-{i}", "newobj", rx, Y_MIXER + 154, 40, 22,
+            "*~ 0.7", ni=2, ot=["signal"])
+        wire(f"mr-{i}", 0, f"mp-l-{i}", 0)
+        wire(f"mp-cos-{i}", 0, f"mp-l-{i}", 1)
+        # R channel *~ (audio × pan_R gain)
+        box(f"mp-r-{i}", "newobj", rx + 50, Y_MIXER + 154, 40, 22,
+            "*~ 0.7", ni=2, ot=["signal"])
+        wire(f"mr-{i}", 0, f"mp-r-{i}", 0)
+        wire(f"mp-sin-{i}", 0, f"mp-r-{i}", 1)
 
-    # +~ cascade: (v0+v1) → +v2 → +v3 → +v4 → +v5
-    add_y = Y_MIXER + 30
+    # L bus +~ cascade
+    add_y = Y_MIXER + 181
     for s in range(5):
         ax = 75 + s * 120
-        box(f"mx-{s}", "newobj", ax, add_y, 35, 22, "+~",
+        box(f"mx-l-{s}", "newobj", ax, add_y, 35, 22, "+~",
             ni=2, ot=["signal"])
-
-    # Wire receive~ into +~ cascade
-    wire("mr-0", 0, "mx-0", 0)
-    wire("mr-1", 0, "mx-0", 1)
+    wire("mp-l-0", 0, "mx-l-0", 0)
+    wire("mp-l-1", 0, "mx-l-0", 1)
     for s in range(1, 5):
-        wire(f"mx-{s-1}", 0, f"mx-{s}", 0)
-        wire(f"mr-{s+1}", 0, f"mx-{s}", 1)
+        wire(f"mx-l-{s-1}", 0, f"mx-l-{s}", 0)
+        wire(f"mp-l-{s+1}", 0, f"mx-l-{s}", 1)
 
-    # Master gain (horizontal slider)
-    box("mx-gain", "gain~", 75, add_y + 30, 500, 30,
+    # R bus +~ cascade
+    for s in range(5):
+        ax = 75 + s * 120
+        box(f"mx-r-{s}", "newobj", ax + 50, add_y, 35, 22, "+~",
+            ni=2, ot=["signal"])
+    wire("mp-r-0", 0, "mx-r-0", 0)
+    wire("mp-r-1", 0, "mx-r-0", 1)
+    for s in range(1, 5):
+        wire(f"mx-r-{s-1}", 0, f"mx-r-{s}", 0)
+        wire(f"mp-r-{s+1}", 0, f"mx-r-{s}", 1)
+
+    # Master gain: sig~ 1. → gain~ → outputs gain level as signal
+    # Then multiply L and R buses by the gain level
+    box("mx-sig1", "newobj", 75, add_y + 30, 50, 22,
+        "sig~ 1.", ot=["signal"])
+    box("mx-gain", "gain~", 130, add_y + 30, 400, 30,
         ni=1, no=2, ot=["signal", ""],
         parameter_enable=0, orientation=1)
-    wire("mx-4", 0, "mx-gain", 0)
+    wire("mx-sig1", 0, "mx-gain", 0)
 
-    # Meter + Scope
-    box("mx-meter", "meter~", 75, add_y + 68, 500, 18, ot=["float"])
+    # L master multiply
+    box("mx-mulL", "newobj", 75, add_y + 66, 40, 22,
+        "*~", ni=2, ot=["signal"])
+    wire("mx-l-4", 0, "mx-mulL", 0)
+    wire("mx-gain", 0, "mx-mulL", 1)
+
+    # R master multiply
+    box("mx-mulR", "newobj", 550, add_y + 66, 40, 22,
+        "*~", ni=2, ot=["signal"])
+    wire("mx-r-4", 0, "mx-mulR", 0)
+    wire("mx-gain", 0, "mx-mulR", 1)
+
+    # Master limiter (soft clip before DAC)
+    lim_y = add_y + 93
+    box("mx-limL", "newobj", 75, lim_y, 70, 22, "clip~ -1. 1.",
+        ni=1, ot=["signal"])
+    box("mx-limR", "newobj", 550, lim_y, 70, 22, "clip~ -1. 1.",
+        ni=1, ot=["signal"])
+    wire("mx-mulL", 0, "mx-limL", 0)
+    wire("mx-mulR", 0, "mx-limR", 0)
+
+    # Meter (L channel) + Scope (after limiter)
+    box("mx-meter", "meter~", 75, lim_y + 28, 500, 18, ot=["float"])
     box("mx-scope", "scope~", 600, add_y + 30, 200, 56, ni=2, no=0)
-    wire("mx-gain", 0, "mx-meter", 0)
-    wire("mx-gain", 0, "mx-scope", 0)
+    wire("mx-limL", 0, "mx-meter", 0)
+    wire("mx-limL", 0, "mx-scope", 0)
+    wire("mx-limR", 0, "mx-scope", 1)
 
-    # DAC + audio toggle
-    dac_y = add_y + 95
+    # DAC (stereo) — below meter
+    dac_y = lim_y + 52
     box("mx-dac", "newobj", 75, dac_y, 60, 22, "dac~ 1 2", ni=2, no=0)
-    wire("mx-gain", 0, "mx-dac", 0)
-    wire("mx-gain", 0, "mx-dac", 1)
+    wire("mx-limL", 0, "mx-dac", 0)
+    wire("mx-limR", 0, "mx-dac", 1)
 
+    # Audio toggle
     box("out-at", "toggle", 165, dac_y - 2, 25, 25, ot=["int"])
     comment("out-al", 195, dac_y, "AUDIO ON/OFF", fontface=1, w=90)
     box("out-as", "newobj", 165, dac_y + 30, 45, 22,
@@ -558,8 +746,8 @@ def build():
         wire("vc-js", i, f"vp-{i}", 0)
 
     # UI update route (outlet 6 → route → set dials)
-    all_params = MACROS + ["pitch", "decay_ms", "exciter_type", "body_type"]
-    all_labels = MACRO_LABELS + ["PITCH", "DECAY", "EXCITER", "BODY"]
+    all_params = MACROS + ["pitch", "decay_ms", "exciter_type", "body_type", "pan"]
+    all_labels = MACRO_LABELS + ["PITCH", "DECAY", "EXCITER", "BODY", "PAN"]
     macro_route = "route " + " ".join(all_params)
     n_params = len(all_params)
 
@@ -567,10 +755,9 @@ def build():
         ni=1, no=n_params + 1, ot=[""] * (n_params + 1))
     wire("vc-js", 6, "vc-route", 0)
 
-    # 12 parameter dials (4 rows × 3 cols to keep compact, or single row)
-    # Single row, 90px spacing = 12 × 90 = 1080 — fits in window
+    # 13 parameter dials (single row, 83px spacing = 13 × 83 = 1079 — fits in window)
     dial_y = Y_EDITOR + 125
-    dial_spacing = 90
+    dial_spacing = 83
 
     for j, (pname, plabel) in enumerate(zip(all_params, all_labels)):
         dx = 30 + j * dial_spacing
@@ -597,128 +784,329 @@ def build():
     # ═══════════════════════ FLAM ENGINE ═══════════════════════
     section_header("sec-fl", 30, Y_FLAM - 15, "FLAM ENGINE")
 
+    # Tap sequencer outlets → prepend trig N → flam engine inlet 0
+    for i in range(6):
+        fx = VOICE_COLS[i]
+        box(f"fl-tp-{i}", "newobj", fx, Y_FLAM - 35, 95, 22,
+            f"prepend trig {i}", ot=[""])
+        wire("sq-js", i, f"fl-tp-{i}", 0)
+        wire(f"fl-tp-{i}", 0, "fl-js", 0)
+
     # Flam engine JS (7 outlets: 0-5=voice bangs, 6=status)
     box("fl-js", "newobj", 75, Y_FLAM, 750, 22,
         "js flamengine.js", ni=3, no=7,
         ot=["bang", "bang", "bang", "bang", "bang", "bang", ""])
 
-    # Master flam controls (single row above per-voice)
-    comment("fl-master-lbl", 75, Y_FLAM + 30, "MASTER:", fontface=1, w=65)
-
-    box("fl-m-sub", "umenu", 145, Y_FLAM + 30, 75, 20,
-        no=2, ot=["int", ""],
-        items=["OFF", ",", "1/32", ",", "1/48", ",", "1/64", ",", "1/96"])
-    box("fl-m-sub-p", "newobj", 225, Y_FLAM + 30, 140, 22,
-        "prepend master_subdivision", ot=[""])
-    wire("fl-m-sub", 0, "fl-m-sub-p", 0)
-    wire("fl-m-sub-p", 0, "fl-js", 1)
-
-    box("fl-m-prob", "dial", 375, Y_FLAM + 25, 30, 30,
-        no=1, ot=["int"], parameter_enable=0)
-    box("fl-m-prob-p", "newobj", 410, Y_FLAM + 30, 140, 22,
-        "prepend master_probability", ot=[""])
-    comment("fl-m-prob-l", 375, Y_FLAM + 57, "PROB", fontsize=9.0, w=35)
-    wire("fl-m-prob", 0, "fl-m-prob-p", 0)
-    wire("fl-m-prob-p", 0, "fl-js", 1)
-
-    box("fl-m-hum", "dial", 555, Y_FLAM + 25, 30, 30,
-        no=1, ot=["int"], parameter_enable=0)
-    box("fl-m-hum-p", "newobj", 590, Y_FLAM + 30, 140, 22,
-        "prepend master_humanize", ot=[""])
-    comment("fl-m-hum-l", 555, Y_FLAM + 57, "HUMAN", fontsize=9.0, w=45)
-    wire("fl-m-hum", 0, "fl-m-hum-p", 0)
-    wire("fl-m-hum-p", 0, "fl-js", 1)
-
-    box("fl-m-burst", "number", 735, Y_FLAM + 30, 40, 22,
-        no=2, ot=["int", "bang"], minimum=1, maximum=8)
-    box("fl-m-burst-p", "newobj", 780, Y_FLAM + 30, 120, 22,
-        "prepend master_burst", ot=[""])
-    comment("fl-m-burst-l", 735, Y_FLAM + 55, "BURST", fontsize=9.0, w=45)
-    wire("fl-m-burst", 0, "fl-m-burst-p", 0)
-    wire("fl-m-burst-p", 0, "fl-js", 1)
-
-    # Tap sequencer outlets → prepend trig N → flam engine inlet 0
+    # Flam engine outlets → voice click~ via send (below JS)
     for i in range(6):
         fx = VOICE_COLS[i]
-        box(f"fl-tp-{i}", "newobj", fx, Y_FLAM - 30, 95, 22,
-            f"prepend trig {i}", ot=[""])
-        wire("sq-js", i, f"fl-tp-{i}", 0)
-        wire(f"fl-tp-{i}", 0, "fl-js", 0)
-
-    # Flam engine outlets → voice click~ via send (reuse v{i}_trig)
-    for i in range(6):
-        fx = VOICE_COLS[i]
-        box(f"fl-snd-{i}", "newobj", fx, Y_FLAM + 30, 80, 22,
+        box(f"fl-snd-{i}", "newobj", fx, Y_FLAM + 25, 80, 22,
             f"send v{i}_trig", ni=1, no=0)
         wire("fl-js", i, f"fl-snd-{i}", 0)
 
     # Transport tempo → flam engine inlet 2
-    wire("tr-calc", 0, "fl-js", 2)
+    wire("tr-ms", 0, "fl-js", 2)
 
-    # Per-voice flam controls (6 columns)
-    FLAM_PARAMS = ["subdivision", "probability", "humanize", "burst"]
-    FLAM_LABELS = ["SUBDIV", "PROB %", "HUMAN", "BURST"]
+    # ── Master flam controls (row 1: SUBDIV PROB HUMAN BURST) ──
+    my1 = Y_FLAM + 52
+    comment("fl-master-lbl", 75, my1, "MASTER:", fontface=1, w=65)
 
-    flam_ctrl_y = Y_FLAM + 75
+    box("fl-m-sub", "umenu", 145, my1, 75, 20,
+        no=2, ot=["int", ""],
+        items=["OFF", ",", "1/32", ",", "1/48", ",", "1/64", ",", "1/96"])
+    box("fl-m-sub-p", "newobj", 225, my1, 140, 22,
+        "prepend master_subdivision", ot=[""])
+    wire("fl-m-sub", 0, "fl-m-sub-p", 0)
+    wire("fl-m-sub-p", 0, "fl-js", 1)
+
+    box("fl-m-prob", "dial", 375, my1 - 5, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    box("fl-m-prob-p", "newobj", 410, my1, 140, 22,
+        "prepend master_probability", ot=[""])
+    comment("fl-m-prob-l", 375, my1 + 28, "PROB", fontsize=9.0, w=35)
+    wire("fl-m-prob", 0, "fl-m-prob-p", 0)
+    wire("fl-m-prob-p", 0, "fl-js", 1)
+
+    box("fl-m-hum", "dial", 555, my1 - 5, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    box("fl-m-hum-p", "newobj", 590, my1, 140, 22,
+        "prepend master_humanize", ot=[""])
+    comment("fl-m-hum-l", 555, my1 + 28, "HUMAN", fontsize=9.0, w=45)
+    wire("fl-m-hum", 0, "fl-m-hum-p", 0)
+    wire("fl-m-hum-p", 0, "fl-js", 1)
+
+    box("fl-m-burst", "number", 735, my1, 40, 22,
+        no=2, ot=["int", "bang"], minimum=1, maximum=8)
+    box("fl-m-burst-p", "newobj", 780, my1, 120, 22,
+        "prepend master_burst", ot=[""])
+    comment("fl-m-burst-l", 735, my1 + 25, "BURST", fontsize=9.0, w=45)
+    wire("fl-m-burst", 0, "fl-m-burst-p", 0)
+    wire("fl-m-burst-p", 0, "fl-js", 1)
+
+    # ── Master row 2: PITCH + VDECAY (clear of row 1) ──
+    my2 = Y_FLAM + 85
+    comment("fl-master-lbl2", 375, my2, "PITCH:", fontface=1,
+            fontsize=9.0, w=45)
+    box("fl-m-pitch", "dial", 420, my2 - 5, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    box("fl-m-pitch-p", "newobj", 455, my2, 140, 22,
+        "prepend master_pitch_mod", ot=[""])
+    wire("fl-m-pitch", 0, "fl-m-pitch-p", 0)
+    wire("fl-m-pitch-p", 0, "fl-js", 1)
+
+    comment("fl-master-lbl3", 600, my2, "VDECAY:", fontface=1,
+            fontsize=9.0, w=55)
+    box("fl-m-vdecay", "dial", 660, my2 - 5, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    box("fl-m-vdecay-p", "newobj", 695, my2, 140, 22,
+        "prepend master_vel_decay", ot=[""])
+    wire("fl-m-vdecay", 0, "fl-m-vdecay-p", 0)
+    wire("fl-m-vdecay-p", 0, "fl-js", 1)
+
+    # ── Per-voice flam controls (6 columns, variable row heights) ──
+    # Prepends are narrowed to fit within 150px columns and use send/receive
+    # to eliminate long wires crossing the patch.
+    FLAM_PARAMS = ["subdivision", "probability", "humanize", "burst", "pitch_mod", "vel_decay"]
+    FLAM_LABELS = ["SUBDIV", "PROB %", "HUMAN", "BURST", "PITCH", "VDECAY"]
+    FLAM_ROW_H = {"subdivision": 25, "probability": 38, "humanize": 38,
+                  "burst": 28, "pitch_mod": 38, "vel_decay": 38}
+
+    flam_ctrl_y = Y_FLAM + 115
 
     for i in range(6):
         fx = VOICE_COLS[i]
         comment(f"fl-vl-{i}", fx, flam_ctrl_y, VOICES[i]["name"],
                 fontface=1, fontsize=10.0, w=55)
 
+        cum_y = 18  # offset below voice name
         for j, (fparam, flabel) in enumerate(zip(FLAM_PARAMS, FLAM_LABELS)):
-            fy = flam_ctrl_y + 18 + j * 22
-            fw = 130
+            fy = flam_ctrl_y + cum_y
 
             if fparam == "subdivision":
-                # umenu for subdivision
                 box(f"fl-{fparam}-{i}", "umenu", fx, fy, 75, 20,
                     no=2, ot=["int", ""],
                     items=["OFF", ",", "1/32", ",", "1/48", ",", "1/64", ",", "1/96"])
-                box(f"fl-{fparam}-p-{i}", "newobj", fx + 80, fy, fw, 22,
+                box(f"fl-{fparam}-p-{i}", "newobj", fx + 80, fy, 65, 22,
                     f"prepend {fparam} {i}", ot=[""])
                 wire(f"fl-{fparam}-{i}", 0, f"fl-{fparam}-p-{i}", 0)
-                wire(f"fl-{fparam}-p-{i}", 0, "fl-js", 1)
             elif fparam == "burst":
-                # number box for burst (1-8)
                 box(f"fl-{fparam}-{i}", "number", fx, fy, 40, 22,
                     no=2, ot=["int", "bang"], minimum=1, maximum=8)
-                box(f"fl-{fparam}-p-{i}", "newobj", fx + 45, fy, fw, 22,
+                box(f"fl-{fparam}-p-{i}", "newobj", fx + 45, fy, 100, 22,
                     f"prepend {fparam} {i}", ot=[""])
                 wire(f"fl-{fparam}-{i}", 0, f"fl-{fparam}-p-{i}", 0)
-                wire(f"fl-{fparam}-p-{i}", 0, "fl-js", 1)
             else:
-                # dial for probability (0-100) and humanize (0-127 → 0-1)
                 box(f"fl-{fparam}-{i}", "dial", fx, fy, 30, 30,
                     no=1, ot=["int"], parameter_enable=0)
-                box(f"fl-{fparam}-p-{i}", "newobj", fx + 35, fy + 4, fw, 22,
+                box(f"fl-{fparam}-p-{i}", "newobj", fx + 35, fy + 4, 110, 22,
                     f"prepend {fparam} {i}", ot=[""])
                 wire(f"fl-{fparam}-{i}", 0, f"fl-{fparam}-p-{i}", 0)
-                wire(f"fl-{fparam}-p-{i}", 0, "fl-js", 1)
+
+            # Wire prepend → per-voice send bus (wireless to fl-js)
+            wire(f"fl-{fparam}-p-{i}", 0, f"fl-sctl-{i}", 0)
+
+            cum_y += FLAM_ROW_H[fparam]
 
         # Column labels (only for first voice column)
         if i == 0:
+            lbl_cum_y = 18
             for j, flabel in enumerate(FLAM_LABELS):
-                fy = flam_ctrl_y + 18 + j * 22
+                fy = flam_ctrl_y + lbl_cum_y
                 comment(f"fl-lbl-{j}", 15, fy + 2, flabel,
                         fontsize=9.0, w=55)
+                lbl_cum_y += FLAM_ROW_H[FLAM_PARAMS[j]]
 
-    # Flam param notifications to kit manager (single prepend below controls)
-    box("fl-km-notify", "newobj", 75, flam_ctrl_y + 110, 140, 22,
-        "prepend flam_param", ot=[""])
-    wire("fl-km-notify", 0, "km-js", 0)
-    # All flam prepend outputs also go to kit manager via this
+    # ── Per-voice send objects (below controls, one per column) ──
+    sctl_y = flam_ctrl_y + cum_y + 5
     for i in range(6):
-        for fparam in FLAM_PARAMS:
-            wire(f"fl-{fparam}-p-{i}", 0, "fl-km-notify", 0)
+        box(f"fl-sctl-{i}", "newobj", VOICE_COLS[i], sctl_y, 65, 22,
+            "s fl_ctrl", ni=1, no=0)
+
+    # ── Receive fl_ctrl → fl-js inlet 1 (wireless from per-voice sends) ──
+    box("fl-r1", "newobj", 930, Y_FLAM + 25, 70, 22,
+        "r fl_ctrl", ni=0, no=1, ot=[""])
+    wire("fl-r1", 0, "fl-js", 1)
+
+    # ── Receive fl_ctrl → kit manager notifications ──
+    box("fl-r2", "newobj", 75, sctl_y + 30, 70, 22,
+        "r fl_ctrl", ni=0, no=1, ot=[""])
+    box("fl-km-notify", "newobj", 75, sctl_y + 55, 140, 22,
+        "prepend flam_param", ot=[""])
+    wire("fl-r2", 0, "fl-km-notify", 0)
+    wire("fl-km-notify", 0, "km-js", 0)
+
+    # ═══════════════════════ GROOVE ═══════════════════════
+    section_header("sec-gr", 30, Y_GROOVE - 15, "GROOVE")
+
+    # Global swing dial + label
+    box("gr-swing", "dial", 75, Y_GROOVE, 40, 40,
+        no=1, ot=["int"], parameter_enable=0)
+    comment("gr-swing-l", 75, Y_GROOVE + 42, "SWING", fontface=1, w=50)
+    box("gr-swing-p", "newobj", 120, Y_GROOVE + 10, 100, 22,
+        "prepend swing", ot=[""])
+    wire("gr-swing", 0, "gr-swing-p", 0)
+    wire("gr-swing-p", 0, "fl-js", 1)
+
+    # Master groove offset dial
+    box("gr-master", "dial", 225, Y_GROOVE, 40, 40,
+        no=1, ot=["int"], parameter_enable=0)
+    comment("gr-master-l", 225, Y_GROOVE + 42, "M.GROOVE", fontface=1, w=65)
+    box("gr-master-p", "newobj", 270, Y_GROOVE + 10, 120, 22,
+        "prepend master_groove", ot=[""])
+    wire("gr-master", 0, "gr-master-p", 0)
+    wire("gr-master-p", 0, "fl-js", 1)
+
+    # Per-voice groove offset dials (6 columns)
+    gr_ctrl_y = Y_GROOVE + 70
+    for i in range(6):
+        gx = VOICE_COLS[i]
+        comment(f"gr-vl-{i}", gx, gr_ctrl_y, VOICES[i]["name"],
+                fontface=1, fontsize=10.0, w=55)
+        box(f"gr-off-{i}", "dial", gx, gr_ctrl_y + 18, 30, 30,
+            no=1, ot=["int"], parameter_enable=0)
+        # Center default at 64
+        box(f"gr-def-{i}", "message", gx + 35, gr_ctrl_y + 22, 22, 18,
+            "64", ni=2, ot=[""])
+        wire("tr-lb", 0, f"gr-def-{i}", 0)
+        wire(f"gr-def-{i}", 0, f"gr-off-{i}", 0)
+
+        box(f"gr-off-p-{i}", "newobj", gx + 35, gr_ctrl_y + 4, 110, 22,
+            f"prepend groove {i}", ot=[""])
+        wire(f"gr-off-{i}", 0, f"gr-off-p-{i}", 0)
+        wire(f"gr-off-p-{i}", 0, "fl-js", 1)
+
+    comment("gr-hint", 75, gr_ctrl_y + 55,
+            "Center=straight. Left=push back. Right=push forward.",
+            w=400)
+
+    # ═══════════════════════ LFO ENGINE ═══════════════════════
+    section_header("sec-lfo", 30, Y_LFO - 15, "LFO ENGINE")
+
+    # LFO engine JS (2 inlets, 2 outlets)
+    box("lfo-js", "newobj", 75, Y_LFO, 750, 22,
+        "js lfoengine.js", ni=2, no=2,
+        ot=["", ""])
+
+    # Transport tempo → LFO engine inlet 0
+    wire("tr-ms", 0, "lfo-js", 0)
+
+    # ── Global LFO controls row ──
+    lfo_glob_y = Y_LFO + 30
+
+    # Master Rate dial
+    box("lfo-g-rate", "dial", 75, lfo_glob_y, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    comment("lfo-g-rate-l", 75, lfo_glob_y + 32, "RATE", fontsize=9.0, w=35)
+    box("lfo-g-rate-p", "newobj", 110, lfo_glob_y + 4, 110, 22,
+        "prepend master_rate", ot=[""])
+    wire("lfo-g-rate", 0, "lfo-g-rate-p", 0)
+    wire("lfo-g-rate-p", 0, "lfo-js", 1)
+
+    # Master Depth dial
+    box("lfo-g-depth", "dial", 225, lfo_glob_y, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    comment("lfo-g-depth-l", 225, lfo_glob_y + 32, "DEPTH", fontsize=9.0, w=40)
+    box("lfo-g-depth-p", "newobj", 260, lfo_glob_y + 4, 120, 22,
+        "prepend master_depth", ot=[""])
+    wire("lfo-g-depth", 0, "lfo-g-depth-p", 0)
+    wire("lfo-g-depth-p", 0, "lfo-js", 1)
+
+    # Coupling K dial
+    box("lfo-g-K", "dial", 390, lfo_glob_y, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    comment("lfo-g-K-l", 390, lfo_glob_y + 32, "COUPLE", fontsize=9.0, w=45)
+    box("lfo-g-K-p", "newobj", 425, lfo_glob_y + 4, 100, 22,
+        "prepend coupling", ot=[""])
+    wire("lfo-g-K", 0, "lfo-g-K-p", 0)
+    wire("lfo-g-K-p", 0, "lfo-js", 1)
+
+    # Topology umenu (13 veve presets)
+    TOPO_NAMES = ["All-to-all", "Legba", "Carrefour", "Ferraille",
+                  "Ogou", "Ring", "Marassa", "Damballah",
+                  "Erzulie", "Baron", "Simbi", "Ayizan", "Gran Bwa"]
+    topo_items = []
+    for tn in TOPO_NAMES:
+        if topo_items:
+            topo_items.append(",")
+        topo_items.append(tn)
+
+    box("lfo-g-topo", "umenu", 540, lfo_glob_y + 4, 100, 20,
+        no=2, ot=["int", ""], items=topo_items)
+    comment("lfo-g-topo-l", 540, lfo_glob_y + 26, "TOPOLOGY", fontsize=9.0, w=60)
+    box("lfo-g-topo-p", "newobj", 645, lfo_glob_y + 4, 100, 22,
+        "prepend topology", ot=[""])
+    wire("lfo-g-topo", 0, "lfo-g-topo-p", 0)
+    wire("lfo-g-topo-p", 0, "lfo-js", 1)
+
+    # Chaos rho dial
+    box("lfo-g-rho", "dial", 790, lfo_glob_y, 30, 30,
+        no=1, ot=["int"], parameter_enable=0)
+    comment("lfo-g-rho-l", 790, lfo_glob_y + 32, "CHAOS", fontsize=9.0, w=40)
+    box("lfo-g-rho-p", "newobj", 825, lfo_glob_y + 4, 100, 22,
+        "prepend chaos_rho", ot=[""])
+    wire("lfo-g-rho", 0, "lfo-g-rho-p", 0)
+    wire("lfo-g-rho-p", 0, "lfo-js", 1)
+
+    # ── Per-voice LFO controls (6 columns) ──
+    SHAPE_ITEMS = ["Sine", ",", "Triangle", ",", "Saw Up", ",", "Saw Down", ",",
+                   "Square", ",", "S&H", ",", "Lorenz X", ",", "Lorenz Y", ",",
+                   "Myombo 2", ",", "Myombo 3", ",", "Chased Chick", ",",
+                   "Hunted Bird", ",", "Lion Stom", ",", "Ancestor"]
+    DEST_ITEMS = ["OFF", ",", "Pan", ",", "Pitch", ",", "Stress", ",", "Bloom", ",",
+                  "Decay", ",", "Mist", ",", "Heat", ",", "Drift", ",", "Density"]
+
+    lfo_ctrl_y = Y_LFO + 75
+
+    for i in range(6):
+        lx = VOICE_COLS[i]
+        comment(f"lfo-vl-{i}", lx, lfo_ctrl_y, VOICES[i]["name"],
+                fontface=1, fontsize=10.0, w=55)
+
+        # Rate dial
+        box(f"lfo-rate-{i}", "dial", lx, lfo_ctrl_y + 18, 30, 30,
+            no=1, ot=["int"], parameter_enable=0)
+        box(f"lfo-rate-p-{i}", "newobj", lx + 35, lfo_ctrl_y + 22, 110, 22,
+            f"prepend lfo_rate {i}", ot=[""])
+        wire(f"lfo-rate-{i}", 0, f"lfo-rate-p-{i}", 0)
+        wire(f"lfo-rate-p-{i}", 0, "lfo-js", 1)
+
+        # Depth dial
+        box(f"lfo-depth-{i}", "dial", lx, lfo_ctrl_y + 56, 30, 30,
+            no=1, ot=["int"], parameter_enable=0)
+        box(f"lfo-depth-p-{i}", "newobj", lx + 35, lfo_ctrl_y + 60, 110, 22,
+            f"prepend lfo_depth {i}", ot=[""])
+        wire(f"lfo-depth-{i}", 0, f"lfo-depth-p-{i}", 0)
+        wire(f"lfo-depth-p-{i}", 0, "lfo-js", 1)
+
+        # Shape umenu
+        box(f"lfo-shape-{i}", "umenu", lx, lfo_ctrl_y + 94, 100, 20,
+            no=2, ot=["int", ""], items=SHAPE_ITEMS)
+        box(f"lfo-shape-p-{i}", "newobj", lx + 105, lfo_ctrl_y + 94, 40, 22,
+            f"prepend lfo_shape {i}", ot=[""])
+        wire(f"lfo-shape-{i}", 0, f"lfo-shape-p-{i}", 0)
+        wire(f"lfo-shape-p-{i}", 0, "lfo-js", 1)
+
+        # Destination umenu
+        box(f"lfo-dest-{i}", "umenu", lx, lfo_ctrl_y + 120, 100, 20,
+            no=2, ot=["int", ""], items=DEST_ITEMS)
+        box(f"lfo-dest-p-{i}", "newobj", lx + 105, lfo_ctrl_y + 120, 40, 22,
+            f"prepend lfo_dest {i}", ot=[""])
+        wire(f"lfo-dest-{i}", 0, f"lfo-dest-p-{i}", 0)
+        wire(f"lfo-dest-p-{i}", 0, "lfo-js", 1)
+
+    # Labels (left edge)
+    comment("lfo-lbl-rate", 15, lfo_ctrl_y + 22, "RATE", fontsize=9.0, w=40)
+    comment("lfo-lbl-depth", 15, lfo_ctrl_y + 60, "DEPTH", fontsize=9.0, w=45)
+    comment("lfo-lbl-shape", 15, lfo_ctrl_y + 94, "SHAPE", fontsize=9.0, w=45)
+    comment("lfo-lbl-dest", 15, lfo_ctrl_y + 120, "DEST", fontsize=9.0, w=40)
 
     # ═══════════════════════ KIT MANAGER ═══════════════════════
     section_header("sec-km", 30, Y_KITS - 15, "KITS")
 
-    # Kit manager JS (6 outlets: params, patterns, lengths, status, flam, levels)
+    # Kit manager JS (8 outlets: params, patterns, lengths, status, flam, levels, lfo, swing/groove)
     box("km-js", "newobj", 75, Y_KITS, 750, 22,
-        "js kitmanager.js", ni=1, no=6,
-        ot=["", "", "", "", "", ""])
+        "js kitmanager.js", ni=1, no=8,
+        ot=["", "", "", "", "", "", "", ""])
 
     # Init kit manager on load
     box("km-init", "message", 855, Y_KITS, 70, 22,
@@ -746,6 +1134,12 @@ def build():
         box(f"km-lvl-snd-{i}", "newobj", 75 + i * 120, Y_KITS + 55, 85, 22,
             f"send v{i}_level", ni=1, no=0)
         wire("km-lvl-route", i, f"km-lvl-snd-{i}", 0)
+
+    # Kit manager outlet 6 → LFO engine (LFO restore)
+    wire("km-js", 6, "lfo-js", 1)
+
+    # Kit manager outlet 7 → flam engine (swing/groove restore)
+    wire("km-js", 7, "fl-js", 1)
 
     # Voicectrl outlet 7 → kit manager (param change notifications)
     wire("vc-js", 7, "km-js", 0)
@@ -848,7 +1242,7 @@ def build():
             "appversion": {"major": 9, "minor": 0, "revision": 0,
                            "architecture": "x64", "modernui": 1},
             "classnamespace": "box",
-            "rect": [20, 40, 1160, 1380],
+            "rect": [20, 40, 1160, 2950],
             "bglocked": 0,
             "openinpresentation": 0,
             "default_fontsize": 12.0,
@@ -858,7 +1252,7 @@ def build():
             "objectsnaponopen": 1,
             "statusbarvisible": 2,
             "toolbarvisible": 1,
-            "description": "Dream Xeno Box - 6-Voice Polymetric Alien Percussion Groovebox",
+            "description": "Maud - 6-Voice Polymetric Alien Percussion Groovebox",
             "boxes": _boxes,
             "lines": _lines,
         }
@@ -867,8 +1261,8 @@ def build():
 
 if __name__ == "__main__":
     patch = build()
-    with open("DreamXenoBox.maxpat", "w") as f:
+    with open("Maud.maxpat", "w") as f:
         json.dump(patch, f, indent="\t")
     nb = len(patch["patcher"]["boxes"])
     nl = len(patch["patcher"]["lines"])
-    print(f"Generated DreamXenoBox.maxpat ({nb} objects, {nl} connections)")
+    print(f"Generated Maud.maxpat ({nb} objects, {nl} connections)")

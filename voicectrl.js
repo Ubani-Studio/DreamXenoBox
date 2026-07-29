@@ -1,4 +1,4 @@
-// DREAM XENO BOX — Voice Parameter Controller
+// MAUD — Voice Parameter Controller
 // inlet 0: voice selection (int 0-5), "init", "restore", "refresh_ui"
 // inlet 1: param changes from UI (message name = param, arg = value)
 // outlets 0-5: param messages to gen~ voice 0-5
@@ -11,7 +11,8 @@ outlets = 8;
 var PARAM_NAMES = [
 	"pitch", "decay_ms", "exciter_type", "body_type",
 	"stress", "bloom", "scar", "weight",
-	"mist", "heat_macro", "drift_param", "density_param"
+	"mist", "heat_macro", "drift_param", "density_param",
+	"pan"
 ];
 
 // Min/max for dial scaling (dials send 0-127, we scale to real range)
@@ -28,28 +29,35 @@ var RANGES = {
 	mist:         [0, 1],
 	heat_macro:   [0, 1],
 	drift_param:  [0, 1],
-	density_param:[0, 1]
+	density_param:[0, 1],
+	pan:          [0, 1]
 };
 
 var voices = [
 	{pitch:30, decay_ms:55, exciter_type:0, body_type:2,
 	 stress:0.1, bloom:0.1, scar:0.05, weight:0.95,
-	 mist:0.0, heat_macro:0.3, drift_param:0.05, density_param:0.5},
+	 mist:0.0, heat_macro:0.3, drift_param:0.05, density_param:0.5,
+	 pan:0.35},
 	{pitch:62, decay_ms:18, exciter_type:0, body_type:0,
 	 stress:0.4, bloom:0.2, scar:0.4, weight:0.4,
-	 mist:0.15, heat_macro:0.5, drift_param:0.05, density_param:0.5},
+	 mist:0.15, heat_macro:0.5, drift_param:0.05, density_param:0.5,
+	 pan:0.65},
 	{pitch:84, decay_ms:12, exciter_type:1, body_type:0,
 	 stress:0.5, bloom:0.15, scar:0.6, weight:0.1,
-	 mist:0.3, heat_macro:0.7, drift_param:0.1, density_param:0.7},
+	 mist:0.3, heat_macro:0.7, drift_param:0.1, density_param:0.7,
+	 pan:0.80},
 	{pitch:52, decay_ms:22, exciter_type:1, body_type:1,
 	 stress:0.2, bloom:0.3, scar:0.15, weight:0.6,
-	 mist:0.05, heat_macro:0.2, drift_param:0.02, density_param:0.4},
+	 mist:0.05, heat_macro:0.2, drift_param:0.02, density_param:0.4,
+	 pan:0.20},
 	{pitch:40, decay_ms:32, exciter_type:0, body_type:3,
 	 stress:0.7, bloom:0.4, scar:0.7, weight:0.8,
-	 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5},
+	 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5,
+	 pan:0.50},
 	{pitch:72, decay_ms:60, exciter_type:1, body_type:2,
 	 stress:0.6, bloom:0.95, scar:0.4, weight:0.2,
-	 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4}
+	 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4,
+	 pan:0.50}
 ];
 
 var selected = 0;
@@ -67,7 +75,12 @@ function init() {
 		var v = voices[i];
 		for (var j = 0; j < PARAM_NAMES.length; j++) {
 			var p = PARAM_NAMES[j];
-			outlet(i, p, v[p]);
+			if (p === "pan") {
+				// Pan goes to mixer via messnamed, not gen~
+				messnamed("v" + i + "_pan", v[p]);
+			} else {
+				outlet(i, p, v[p]);
+			}
 		}
 	}
 	updateUI();
@@ -78,7 +91,11 @@ function restore(voice_idx, param, value) {
 	voice_idx = Math.floor(voice_idx);
 	if (voice_idx >= 0 && voice_idx < 6 && RANGES[param] !== undefined) {
 		voices[voice_idx][param] = value;
-		outlet(voice_idx, param, value);
+		if (param === "pan") {
+			messnamed("v" + voice_idx + "_pan", value);
+		} else {
+			outlet(voice_idx, param, value);
+		}
 	}
 }
 
@@ -117,8 +134,17 @@ function anything() {
 			} else {
 				val = r[0] + (raw / 127.0) * (r[1] - r[0]);
 			}
+			// Pan center snap: values within ±0.025 of 0.5 lock to dead center
+			if (param === "pan" && Math.abs(val - 0.5) < 0.025) {
+				val = 0.5;
+			}
 			voices[selected][param] = val;
-			outlet(selected, param, val);
+			if (param === "pan") {
+				// Pan goes to mixer, not gen~
+				messnamed("v" + selected + "_pan", val);
+			} else {
+				outlet(selected, param, val);
+			}
 			// Notify kit manager of change
 			outlet(7, "voice_param", selected, param, val);
 		}

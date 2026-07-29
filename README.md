@@ -1,10 +1,10 @@
-# Dream Xeno Box
+# Maud
 
 A 6-voice alien percussion instrument built in Max/MSP gen~. Each voice is a material body under pressure — not a drum category. Sound comes from excitation striking a resonant body, passing through fracture and feedback resonance stages, shaped by accumulated memory of past performance. Repetition changes the instrument. Silence restores it.
 
 ## Quick Start
 
-1. Open `DreamXenoBox.maxpat` in Max 9
+1. Open `Maud.maxpat` in Max 9
 2. Toggle **AUDIO ON/OFF**
 3. Toggle **PLAY**
 4. Click the matrixctrl grid to edit patterns
@@ -90,8 +90,10 @@ Kit 1 ("INIT") is auto-saved on load with default settings.
 ## Architecture
 
 ```
-TRANSPORT:  metro → counter → step dispatch
-SEQUENCER:  js sequencer.js (6 × 32 steps, polymetric lengths)
+TRANSPORT:  BPM → sig~ → *~ (division ratio) → phasor~ → delta~ → <~ 0 → edge~ → gate → counter
+            Audio-rate clocking for sample-accurate timing (~1.45ms vector-quantized)
+            Division selector: 1/16, 1/8, 1/8T, 1/16T, 1/32
+SEQUENCER:  js sequencer.js (6 × 32 steps, polymetric lengths, step indicator)
 FLAM:       js flamengine.js (sub-rhythmic bursts, probability, humanize)
 VOICES:     6 × gen~ (v3 engine: 4 body types, feedback resonance, non-linear decay)
 MIXER:      send~/receive~ → +~ chain → gain~ → dac~
@@ -104,8 +106,8 @@ MIDI:       notein → select → per-voice triggers
 
 | File | Purpose |
 |------|---------|
-| `DreamXenoBox.maxpat` | Full 6-voice sequencer groovebox |
-| `DreamXenoBox_proto.maxpat` | Single-voice prototype for testing |
+| `Maud.maxpat` | Full 6-voice sequencer groovebox |
+| `Maud_proto.maxpat` | Single-voice prototype for testing |
 | `sequencer.js` | Polymetric step sequencer dispatcher |
 | `flamengine.js` | Sub-rhythmic burst generator (flam/rolls/texture) |
 | `voicectrl.js` | Tabbed voice parameter editor |

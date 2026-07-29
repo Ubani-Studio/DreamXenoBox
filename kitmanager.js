@@ -1,4 +1,4 @@
-// DREAM XENO BOX — Kit Manager
+// MAUD — Kit Manager
 // inlet 0: messages (save, load, name, getnames)
 // outlet 0: voice param restore messages (voice_index param_name value) → voicectrl
 // outlet 1: pattern restore messages (col row value) → matrixctrl
@@ -6,9 +6,11 @@
 // outlet 3: status/UI messages (kit_name, kit_names list)
 // outlet 4: flam restore messages → flamengine
 // outlet 5: level restore messages → send v{i}_level
+// outlet 6: LFO restore messages → lfoengine
+// outlet 7: swing/groove restore messages → flamengine
 
 inlets = 1;
-outlets = 6;
+outlets = 8;
 
 var NUM_VOICES = 6;
 var MAX_STEPS = 32;
@@ -17,7 +19,8 @@ var NUM_SLOTS = 8;
 var PARAM_NAMES = [
 	"pitch", "decay_ms", "exciter_type", "body_type",
 	"stress", "bloom", "scar", "weight",
-	"mist", "heat_macro", "drift_param", "density_param"
+	"mist", "heat_macro", "drift_param", "density_param",
+	"pan"
 ];
 
 // 8 kit slots
@@ -34,9 +37,20 @@ var cur_patterns = [];
 var cur_lengths = [16, 16, 16, 16, 16, 16];
 var cur_flam = [];
 for (var _fi = 0; _fi < NUM_VOICES; _fi++) {
-	cur_flam[_fi] = {subdivision: 0, probability: 50, humanize: 0, burst: 1};
+	cur_flam[_fi] = {subdivision: 0, probability: 50, humanize: 0, burst: 1, pitch_mod: 0, vel_decay: 0};
 }
-var cur_levels = [0.5, 0.3, 0.25, 0.3, 0.35, 0.2];
+var cur_levels = [0.85, 0.7, 0.6, 0.65, 0.75, 0.55];
+
+// Swing + groove state (tracks flamengine)
+var cur_swing = 0;
+var cur_groove = [0, 0, 0, 0, 0, 0];
+
+// LFO state (tracks lfoengine)
+var cur_lfo = [];
+for (var _li = 0; _li < NUM_VOICES; _li++) {
+	cur_lfo[_li] = {rate: 0.5, depth: 0, shape: 0, dest: 0};
+}
+var cur_lfo_globals = {coupling_K: 0, topo_idx: 0, chaos_rho: 28};
 
 // Length index map (matches sequencer.js)
 var LEN_MAP = [4, 8, 12, 16, 24, 32];
@@ -46,22 +60,28 @@ function init_defaults() {
 	cur_voices = [
 		{pitch:30, decay_ms:55, exciter_type:0, body_type:2,
 		 stress:0.1, bloom:0.1, scar:0.05, weight:0.95,
-		 mist:0.0, heat_macro:0.3, drift_param:0.05, density_param:0.5},
+		 mist:0.0, heat_macro:0.3, drift_param:0.05, density_param:0.5,
+		 pan:0.35},
 		{pitch:62, decay_ms:18, exciter_type:0, body_type:0,
 		 stress:0.4, bloom:0.2, scar:0.4, weight:0.4,
-		 mist:0.15, heat_macro:0.5, drift_param:0.05, density_param:0.5},
+		 mist:0.15, heat_macro:0.5, drift_param:0.05, density_param:0.5,
+		 pan:0.65},
 		{pitch:84, decay_ms:12, exciter_type:1, body_type:0,
 		 stress:0.5, bloom:0.15, scar:0.6, weight:0.1,
-		 mist:0.3, heat_macro:0.7, drift_param:0.1, density_param:0.7},
+		 mist:0.3, heat_macro:0.7, drift_param:0.1, density_param:0.7,
+		 pan:0.80},
 		{pitch:52, decay_ms:22, exciter_type:1, body_type:1,
 		 stress:0.2, bloom:0.3, scar:0.15, weight:0.6,
-		 mist:0.05, heat_macro:0.2, drift_param:0.02, density_param:0.4},
+		 mist:0.05, heat_macro:0.2, drift_param:0.02, density_param:0.4,
+		 pan:0.20},
 		{pitch:40, decay_ms:32, exciter_type:0, body_type:3,
 		 stress:0.7, bloom:0.4, scar:0.7, weight:0.8,
-		 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5},
+		 mist:0.2, heat_macro:0.4, drift_param:0.15, density_param:0.5,
+		 pan:0.50},
 		{pitch:72, decay_ms:60, exciter_type:1, body_type:2,
 		 stress:0.6, bloom:0.95, scar:0.4, weight:0.2,
-		 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4}
+		 mist:0.9, heat_macro:0.4, drift_param:0.05, density_param:0.4,
+		 pan:0.50}
 	];
 
 	cur_patterns = [
@@ -91,7 +111,15 @@ function snapshot() {
 		patterns: [],
 		lengths: cur_lengths.slice(),
 		flam: [],
-		levels: cur_levels.slice()
+		levels: cur_levels.slice(),
+		swing: cur_swing,
+		groove: cur_groove.slice(),
+		lfo: [],
+		lfo_globals: {
+			coupling_K: cur_lfo_globals.coupling_K,
+			topo_idx: cur_lfo_globals.topo_idx,
+			chaos_rho: cur_lfo_globals.chaos_rho
+		}
 	};
 	for (var i = 0; i < NUM_VOICES; i++) {
 		var v = {};
@@ -105,7 +133,15 @@ function snapshot() {
 			subdivision: cur_flam[i].subdivision,
 			probability: cur_flam[i].probability,
 			humanize: cur_flam[i].humanize,
-			burst: cur_flam[i].burst
+			burst: cur_flam[i].burst,
+			pitch_mod: cur_flam[i].pitch_mod,
+			vel_decay: cur_flam[i].vel_decay
+		});
+		snap.lfo.push({
+			rate: cur_lfo[i].rate,
+			depth: cur_lfo[i].depth,
+			shape: cur_lfo[i].shape,
+			dest: cur_lfo[i].dest
 		});
 	}
 	return snap;
@@ -153,6 +189,34 @@ function voice_level(voice, value) {
 	}
 }
 
+// Update swing state (from flamengine)
+function swing_param(value) {
+	cur_swing = value;
+}
+
+// Update groove state (from flamengine)
+function groove_param(voice, value) {
+	voice = Math.floor(voice);
+	if (voice >= 0 && voice < NUM_VOICES) {
+		cur_groove[voice] = value;
+	}
+}
+
+// Update LFO per-voice state (from lfoengine)
+function lfo_param(param, voice, value) {
+	voice = Math.floor(voice);
+	if (voice >= 0 && voice < NUM_VOICES && cur_lfo[voice]) {
+		cur_lfo[voice][param] = value;
+	}
+}
+
+// Update LFO global state (from lfoengine)
+function lfo_global_param(param, value) {
+	if (cur_lfo_globals[param] !== undefined) {
+		cur_lfo_globals[param] = value;
+	}
+}
+
 // Save current state to slot
 function save(slot) {
 	slot = Math.floor(slot);
@@ -186,6 +250,7 @@ function load(slot) {
 		for (var j2 = 0; j2 < PARAM_NAMES.length; j2++) {
 			cur_voices[i][PARAM_NAMES[j2]] = v[PARAM_NAMES[j2]];
 		}
+		// Pan goes to mixer via messnamed (voicectrl.restore handles this)
 	}
 
 	// Clear matrixctrl then set pattern → outlet 1
@@ -220,17 +285,58 @@ function load(slot) {
 		}
 	}
 
-	// Restore flam params → outlet 4
+	// Restore flam params → outlet 4 (now includes pitch_mod and vel_decay)
 	if (kit.flam) {
 		for (var i4 = 0; i4 < NUM_VOICES; i4++) {
 			var fl = kit.flam[i4];
 			if (fl) {
-				outlet(4, "restore_voice", i4, fl.subdivision, fl.probability, fl.humanize, fl.burst);
+				outlet(4, "restore_voice", i4,
+					fl.subdivision, fl.probability, fl.humanize, fl.burst,
+					fl.pitch_mod !== undefined ? fl.pitch_mod : 0,
+					fl.vel_decay !== undefined ? fl.vel_decay : 0);
 				cur_flam[i4].subdivision = fl.subdivision;
 				cur_flam[i4].probability = fl.probability;
 				cur_flam[i4].humanize = fl.humanize;
 				cur_flam[i4].burst = fl.burst;
+				cur_flam[i4].pitch_mod = fl.pitch_mod || 0;
+				cur_flam[i4].vel_decay = fl.vel_decay || 0;
 			}
+		}
+	}
+
+	// Restore swing + groove → outlet 7 (to flamengine)
+	if (kit.swing !== undefined) {
+		cur_swing = kit.swing;
+		outlet(7, "restore_swing_groove",
+			kit.swing,
+			kit.groove[0], kit.groove[1], kit.groove[2],
+			kit.groove[3], kit.groove[4], kit.groove[5]);
+		for (var ig = 0; ig < NUM_VOICES; ig++) {
+			cur_groove[ig] = kit.groove[ig];
+		}
+	}
+
+	// Restore LFO state → outlet 6 (to lfoengine)
+	if (kit.lfo) {
+		for (var i6 = 0; i6 < NUM_VOICES; i6++) {
+			var lf = kit.lfo[i6];
+			if (lf) {
+				outlet(6, "restore_voice", i6, lf.rate, lf.depth, lf.shape, lf.dest);
+				cur_lfo[i6].rate = lf.rate;
+				cur_lfo[i6].depth = lf.depth;
+				cur_lfo[i6].shape = lf.shape;
+				cur_lfo[i6].dest = lf.dest;
+			}
+		}
+		if (kit.lfo_globals) {
+			var lg = kit.lfo_globals;
+			outlet(6, "restore_globals",
+				lg.coupling_K !== undefined ? lg.coupling_K : 0,
+				lg.topo_idx !== undefined ? lg.topo_idx : 0,
+				lg.chaos_rho !== undefined ? lg.chaos_rho : 28);
+			cur_lfo_globals.coupling_K = lg.coupling_K || 0;
+			cur_lfo_globals.topo_idx = lg.topo_idx || 0;
+			cur_lfo_globals.chaos_rho = (lg.chaos_rho !== undefined) ? lg.chaos_rho : 28;
 		}
 	}
 
@@ -281,6 +387,16 @@ function anything() {
 	} else if (msg === "flam_param") {
 		// args: param_name, voice_index, value
 		flam_param(args[0], args[1], args[2]);
+	} else if (msg === "swing_param") {
+		swing_param(args[0]);
+	} else if (msg === "groove_param") {
+		groove_param(args[0], args[1]);
+	} else if (msg === "lfo_param") {
+		// args: param_name, voice_index, value
+		lfo_param(args[0], args[1], args[2]);
+	} else if (msg === "lfo_global_param") {
+		// args: param_name, value
+		lfo_global_param(args[0], args[1]);
 	} else if (msg === "getnames") {
 		getnames();
 	} else if (msg === "init_defaults") {

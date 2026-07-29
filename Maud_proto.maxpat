@@ -13,9 +13,9 @@
 		"objectsnaponopen" : 1,
 		"statusbarvisible" : 2,
 		"toolbarvisible" : 1,
-		"description" : "Dream Xeno Box - Alien Percussion Voice Prototype",
+		"description" : "Maud - Alien Percussion Voice Prototype",
 		"boxes" : [
-			{ "box" : { "id" : "obj-title", "maxclass" : "comment", "numinlets" : 1, "numoutlets" : 0, "patching_rect" : [ 30.0, 10.0, 500.0, 24.0 ], "text" : "DREAM XENO BOX - Alien Percussion Voice Prototype", "fontsize" : 16.0, "fontface" : 1 } },
+			{ "box" : { "id" : "obj-title", "maxclass" : "comment", "numinlets" : 1, "numoutlets" : 0, "patching_rect" : [ 30.0, 10.0, 500.0, 24.0 ], "text" : "MAUD - Alien Percussion Voice Prototype", "fontsize" : 16.0, "fontface" : 1 } },
 			{ "box" : { "id" : "obj-trig-label", "maxclass" : "comment", "numinlets" : 1, "numoutlets" : 0, "patching_rect" : [ 30.0, 45.0, 100.0, 20.0 ], "text" : "== TRIGGER ==" } },
 			{ "box" : { "id" : "obj-btn", "maxclass" : "button", "numinlets" : 1, "numoutlets" : 1, "outlettype" : [ "bang" ], "patching_rect" : [ 30.0, 70.0, 40.0, 40.0 ] } },
 			{ "box" : { "id" : "obj-click", "maxclass" : "newobj", "numinlets" : 1, "numoutlets" : 1, "outlettype" : [ "signal" ], "patching_rect" : [ 30.0, 120.0, 42.0, 22.0 ], "text" : "click~" } },

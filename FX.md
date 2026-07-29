@@ -1,4 +1,4 @@
-# DREAM XENO BOX — Effects Module Design (Parked)
+# MAUD — Effects Module Design (Parked)
 
 > Build these AFTER Stage 3 (6 voices + sequencer) is playable.
 > Per-voice fracture/halo/memory already exist in the gen~ voice engine.

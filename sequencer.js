@@ -1,11 +1,11 @@
-// DREAM XENO BOX — Polymetric Step Sequencer
+// MAUD — Polymetric Step Sequencer
 // inlet 0: step number (from counter, 0+)
 // inlet 1: messages (matrixctrl output, setlength, clear)
 // outlets 0-5: bang per voice trigger
 // outlet 6: global step number (passthrough for display)
 
 inlets = 2;
-outlets = 7;
+outlets = 8;
 
 var NUM_VOICES = 6;
 var MAX_STEPS = 32;
@@ -29,15 +29,29 @@ for (var i = 0; i < NUM_VOICES; i++) {
 	}
 }
 
+// Pre-allocated indicator array (reused every step to avoid GC pressure)
+var ind = new Array(MAX_STEPS);
+for (var k = 0; k < MAX_STEPS; k++) ind[k] = 0;
+var prev_display_step = -1;
+
+// Pre-allocated length map (avoid per-call allocation in setlength_idx)
+var LEN_MAP = [4, 8, 12, 16, 24, 32];
+
 function msg_int(step) {
 	if (inlet === 0) {
 		for (var i = 5; i >= 0; i--) {
 			var s = step % lengths[i];
 			if (patterns[i][s] > 0) {
-				outlet(i, "bang");
+				outlet(i, step);
 			}
 		}
 		outlet(6, step);
+		// Step indicator: mutate pre-allocated array in-place (no GC)
+		var display_step = step % MAX_STEPS;
+		if (prev_display_step >= 0) ind[prev_display_step] = 0;
+		ind[display_step] = 1;
+		prev_display_step = display_step;
+		outlet(7, ind);
 	}
 }
 
@@ -66,11 +80,10 @@ function setlength(voice, len) {
 
 // Map umenu index to step count: 0=4, 1=8, 2=12, 3=16, 4=24, 5=32
 function setlength_idx(voice, idx) {
-	var map = [4, 8, 12, 16, 24, 32];
 	idx = Math.floor(idx);
 	voice = Math.floor(voice);
-	if (idx >= 0 && idx < map.length && voice >= 0 && voice < NUM_VOICES) {
-		lengths[voice] = map[idx];
+	if (idx >= 0 && idx < LEN_MAP.length && voice >= 0 && voice < NUM_VOICES) {
+		lengths[voice] = LEN_MAP[idx];
 	}
 }
 
