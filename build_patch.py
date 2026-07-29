@@ -1584,15 +1584,18 @@ def build_presentation():
 
     # Bar and beat markers. 780px over 32 steps is 24.375px a step.
     step_w = 780.0 / 32
+    # At 1/16, four steps is a BEAT and sixteen is a BAR. The first pass marked
+    # every four and numbered them 1..8, which read as eight bars when it is two.
     for b in range(1, 8):
         bx = M + 92 + b * 4 * step_w
-        strong = (b % 4 == 0)          # every bar
-        half = (b % 2 == 0)            # every half bar
-        col = [1, 1, 1, 0.22] if strong else ([1, 1, 1, 0.12] if half else [1, 1, 1, 0.06])
+        bar = (b % 4 == 0)
+        col = [1, 1, 1, 0.26] if bar else [1, 1, 1, 0.07]
         prect(f"p-bar-{b}", bx - 1, gy + 2, 1, 164, col)
     for b in range(8):
+        beat = b % 4 + 1
         plabel(f"p-bn-{b}", M + 92 + b * 4 * step_w + 2, gy - 15,
-               str(b + 1), w=18, size=9)
+               (f"{b // 4 + 1}.{beat}" if beat == 1 else str(beat)),
+               w=24, size=9)
 
     prect("p-r2", M, gy + 184, PW - 2 * M, 1)
 

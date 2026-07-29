@@ -46,8 +46,16 @@ function msg_int(step) {
 			}
 		}
 		outlet(6, step);
-		// Step indicator: mutate pre-allocated array in-place (no GC)
-		var display_step = step % MAX_STEPS;
+		// Step indicator: mutate pre-allocated array in-place (no GC).
+		// The cycle is the LONGEST active voice length, not the grid width. It
+		// was step % MAX_STEPS, so with every length at 16 the highlight ran all
+		// 32 columns while the music repeated every 16: the highlight went round
+		// twice per loop and never lined up with what you heard.
+		var cycle = lengths[0];
+		for (var c = 1; c < NUM_VOICES; c++) {
+			if (lengths[c] > cycle) cycle = lengths[c];
+		}
+		var display_step = step % cycle;
 		if (prev_display_step >= 0) ind[prev_display_step] = 0;
 		ind[display_step] = 1;
 		prev_display_step = display_step;

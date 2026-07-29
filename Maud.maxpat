@@ -13665,7 +13665,7 @@
 						1,
 						1,
 						1,
-						0.06
+						0.07
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13701,7 +13701,7 @@
 						1,
 						1,
 						1,
-						0.12
+						0.07
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13737,7 +13737,7 @@
 						1,
 						1,
 						1,
-						0.06
+						0.07
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13773,7 +13773,7 @@
 						1,
 						1,
 						1,
-						0.22
+						0.26
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13809,7 +13809,7 @@
 						1,
 						1,
 						1,
-						0.06
+						0.07
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13845,7 +13845,7 @@
 						1,
 						1,
 						1,
-						0.12
+						0.07
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13881,7 +13881,7 @@
 						1,
 						1,
 						1,
-						0.06
+						0.07
 					],
 					"border": 1,
 					"bordercolor": [
@@ -13902,15 +13902,15 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
-					"text": "1",
+					"text": "1.1",
 					"presentation": 1,
 					"presentation_rect": [
 						124.0,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -13932,7 +13932,7 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
 					"text": "2",
@@ -13940,7 +13940,7 @@
 					"presentation_rect": [
 						221.5,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -13962,7 +13962,7 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
 					"text": "3",
@@ -13970,7 +13970,7 @@
 					"presentation_rect": [
 						319.0,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -13992,7 +13992,7 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
 					"text": "4",
@@ -14000,7 +14000,7 @@
 					"presentation_rect": [
 						416.5,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -14022,15 +14022,15 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
-					"text": "5",
+					"text": "2.1",
 					"presentation": 1,
 					"presentation_rect": [
 						514.0,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -14052,15 +14052,15 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
-					"text": "6",
+					"text": "2",
 					"presentation": 1,
 					"presentation_rect": [
 						611.5,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -14082,15 +14082,15 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
-					"text": "7",
+					"text": "3",
 					"presentation": 1,
 					"presentation_rect": [
 						709.0,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
@@ -14112,15 +14112,15 @@
 					"patching_rect": [
 						-900,
 						-900,
-						18,
+						24,
 						15
 					],
-					"text": "8",
+					"text": "4",
 					"presentation": 1,
 					"presentation_rect": [
 						806.5,
 						113,
-						18,
+						24,
 						15
 					],
 					"textcolor": [
