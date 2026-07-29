@@ -1689,7 +1689,7 @@
 					"outlettype": [
 						""
 					],
-					"text": "set 0 0 1, set 4 0 1, set 8 0 1, set 12 0 1, set 2 1 1, set 6 1 1, set 10 1 1, set 14 1 1, set 0 2 1, set 2 2 1, set 3 2 1, set 6 2 1, set 8 2 1, set 10 2 1, set 11 2 1, set 14 2 1, set 4 3 1, set 12 3 1, set 0 4 1, set 8 4 1, set 3 5 1, set 11 5 1"
+					"text": "clear"
 				}
 			},
 			{
@@ -7559,6 +7559,83 @@
 			},
 			{
 				"box": {
+					"id": "fl-direct",
+					"maxclass": "toggle",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						15,
+						1385,
+						20,
+						20
+					],
+					"outlettype": [
+						"int"
+					]
+				}
+			},
+			{
+				"box": {
+					"id": "fl-dir1",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						45,
+						1385,
+						40,
+						22
+					],
+					"text": "+ 1"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-dir0",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						95,
+						1385,
+						60,
+						22
+					],
+					"text": "== 0"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-direct-l",
+					"maxclass": "comment",
+					"numinlets": 1,
+					"numoutlets": 0,
+					"patching_rect": [
+						165,
+						1385,
+						340,
+						20
+					],
+					"text": "DIRECT TRIGGERS  main hit bypasses the flam engine"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-dirinit",
+					"maxclass": "newobj",
+					"numinlets": 1,
+					"numoutlets": 1,
+					"patching_rect": [
+						15,
+						1357,
+						90,
+						22
+					],
+					"text": "loadmess 1"
+				}
+			},
+			{
+				"box": {
 					"id": "fl-snd-0",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -7570,6 +7647,42 @@
 						22
 					],
 					"text": "send v0_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-g-0",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						165,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-d-0",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						235,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
 				}
 			},
 			{
@@ -7589,6 +7702,42 @@
 			},
 			{
 				"box": {
+					"id": "fl-g-1",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						315,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-d-1",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						385,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
 					"id": "fl-snd-2",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -7600,6 +7749,42 @@
 						22
 					],
 					"text": "send v2_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-g-2",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						465,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-d-2",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						535,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
 				}
 			},
 			{
@@ -7619,6 +7804,42 @@
 			},
 			{
 				"box": {
+					"id": "fl-g-3",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						615,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-d-3",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						685,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
 					"id": "fl-snd-4",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -7634,6 +7855,42 @@
 			},
 			{
 				"box": {
+					"id": "fl-g-4",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						765,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-d-4",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						835,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
 					"id": "fl-snd-5",
 					"maxclass": "newobj",
 					"numinlets": 1,
@@ -7645,6 +7902,42 @@
 						22
 					],
 					"text": "send v5_trig"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-g-5",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						915,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
+				}
+			},
+			{
+				"box": {
+					"id": "fl-d-5",
+					"maxclass": "newobj",
+					"numinlets": 2,
+					"numoutlets": 1,
+					"patching_rect": [
+						985,
+						1445,
+						60,
+						22
+					],
+					"outlettype": [
+						""
+					],
+					"text": "gate"
 				}
 			},
 			{
@@ -19766,7 +20059,67 @@
 			{
 				"patchline": {
 					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-dir1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-dir0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dirinit",
+						0
+					],
+					"destination": [
+						"fl-direct",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dir0",
+						0
+					],
+					"destination": [
+						"fl-g-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"fl-js",
+						0
+					],
+					"destination": [
+						"fl-g-0",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-g-0",
 						0
 					],
 					"destination": [
@@ -19778,11 +20131,119 @@
 			{
 				"patchline": {
 					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-d-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"nq-sw-0",
+						0
+					],
+					"destination": [
+						"fl-d-0",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-d-0",
+						0
+					],
+					"destination": [
+						"fl-snd-0",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dir0",
+						0
+					],
+					"destination": [
+						"fl-g-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
 						"fl-js",
 						1
 					],
 					"destination": [
+						"fl-g-1",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-g-1",
+						0
+					],
+					"destination": [
 						"fl-snd-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-d-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"nq-sw-1",
+						0
+					],
+					"destination": [
+						"fl-d-1",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-d-1",
+						0
+					],
+					"destination": [
+						"fl-snd-1",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dir0",
+						0
+					],
+					"destination": [
+						"fl-g-2",
 						0
 					]
 				}
@@ -19794,7 +20255,67 @@
 						2
 					],
 					"destination": [
+						"fl-g-2",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-g-2",
+						0
+					],
+					"destination": [
 						"fl-snd-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-d-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"nq-sw-2",
+						0
+					],
+					"destination": [
+						"fl-d-2",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-d-2",
+						0
+					],
+					"destination": [
+						"fl-snd-2",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dir0",
+						0
+					],
+					"destination": [
+						"fl-g-3",
 						0
 					]
 				}
@@ -19806,7 +20327,67 @@
 						3
 					],
 					"destination": [
+						"fl-g-3",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-g-3",
+						0
+					],
+					"destination": [
 						"fl-snd-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-d-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"nq-sw-3",
+						0
+					],
+					"destination": [
+						"fl-d-3",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-d-3",
+						0
+					],
+					"destination": [
+						"fl-snd-3",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dir0",
+						0
+					],
+					"destination": [
+						"fl-g-4",
 						0
 					]
 				}
@@ -19818,7 +20399,67 @@
 						4
 					],
 					"destination": [
+						"fl-g-4",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-g-4",
+						0
+					],
+					"destination": [
 						"fl-snd-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-d-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"nq-sw-4",
+						0
+					],
+					"destination": [
+						"fl-d-4",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-d-4",
+						0
+					],
+					"destination": [
+						"fl-snd-4",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-dir0",
+						0
+					],
+					"destination": [
+						"fl-g-5",
 						0
 					]
 				}
@@ -19828,6 +20469,54 @@
 					"source": [
 						"fl-js",
 						5
+					],
+					"destination": [
+						"fl-g-5",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-g-5",
+						0
+					],
+					"destination": [
+						"fl-snd-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-direct",
+						0
+					],
+					"destination": [
+						"fl-d-5",
+						0
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"nq-sw-5",
+						0
+					],
+					"destination": [
+						"fl-d-5",
+						1
+					]
+				}
+			},
+			{
+				"patchline": {
+					"source": [
+						"fl-d-5",
+						0
 					],
 					"destination": [
 						"fl-snd-5",

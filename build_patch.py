@@ -598,8 +598,10 @@ def build():
         for step, val in enumerate(v["pattern"]):
             if val > 0:
                 init_parts.append(f"set {step} {i} 1")
+    # Grid starts empty. init_parts is kept so the built-in demo pattern is one
+    # edit away, but nothing fires it at load.
     box("sq-init", "message", GRID_X, Y_SEQ_JS + 30, 700, 22,
-        ", ".join(init_parts), ni=2, ot=[""])
+        ", ".join(init_parts) if False else "clear", ni=2, ot=[""])
     wire("tr-lb", 0, "sq-init", 0)
     wire("sq-init", 0, "sq-grid", 0)
 
@@ -1021,12 +1023,50 @@ def build():
         "js flamengine.js", ni=3, no=7,
         ot=["bang", "bang", "bang", "bang", "bang", "bang", ""])
 
-    # Flam engine outlets → voice click~ via send (below JS)
+    # ── Trigger routing: direct or through the flam engine ────────────
+    # Every hit used to pass through js flamengine, which runs in Max's
+    # low-priority queue, and when swing or groove is non-zero it reschedules
+    # through a js Task, which is a low-priority timer. So the main hit — the one
+    # that has to be on the beat — was queued behind UI and garbage collection.
+    #
+    # DIRECT (default): the sequencer bang goes straight to the voice at
+    # scheduler priority. The flam engine still runs and still produces its
+    # sub-hits; only the main hit stops going through it. Swing and groove no
+    # longer displace the main hit in this mode, which is the honest trade: they
+    # were being applied by an unreliable timer.
+    #
+    # THROUGH (toggle off): the original path, for comparing.
+    box("fl-direct", "toggle", VOICE_COLS[0] - 60, Y_FLAM - 60, 20, 20,
+        ot=["int"])
+    box("fl-dir1", "newobj", VOICE_COLS[0] - 30, Y_FLAM - 60, 40, 22, "+ 1")
+    wire("fl-direct", 0, "fl-dir1", 0)
+    box("fl-dir0", "newobj", VOICE_COLS[0] + 20, Y_FLAM - 60, 60, 22, "== 0")
+    wire("fl-direct", 0, "fl-dir0", 0)
+    comment("fl-direct-l", VOICE_COLS[0] + 90, Y_FLAM - 60,
+            "DIRECT TRIGGERS  main hit bypasses the flam engine", w=340)
+    box("fl-dirinit", "newobj", VOICE_COLS[0] - 60, Y_FLAM - 88, 90, 22,
+        "loadmess 1")
+    wire("fl-dirinit", 0, "fl-direct", 0)
+
     for i in range(6):
         fx = VOICE_COLS[i]
         box(f"fl-snd-{i}", "newobj", fx, Y_FLAM + 25, 80, 22,
             f"send v{i}_trig", ni=1, no=0)
-        wire("fl-js", i, f"fl-snd-{i}", 0)
+        # Flam engine output, gated off while direct is on so the main hit is
+        # not heard twice. Sub-hits still arrive on the same outlets, so this
+        # also mutes them in direct mode; that is the current honest limit and
+        # the reason the toggle exists.
+        box(f"fl-g-{i}", "newobj", fx + 90, Y_FLAM, 60, 22, "gate", ni=2,
+            ot=[""])
+        wire("fl-dir0", 0, f"fl-g-{i}", 0)
+        wire("fl-js", i, f"fl-g-{i}", 1)
+        wire(f"fl-g-{i}", 0, f"fl-snd-{i}", 0)
+        # The direct path: sequencer switch straight to the voice.
+        box(f"fl-d-{i}", "newobj", fx + 160, Y_FLAM, 60, 22, "gate", ni=2,
+            ot=[""])
+        wire("fl-direct", 0, f"fl-d-{i}", 0)
+        wire(f"nq-sw-{i}", 0, f"fl-d-{i}", 1)
+        wire(f"fl-d-{i}", 0, f"fl-snd-{i}", 0)
 
     # Transport tempo → flam engine inlet 2
     wire("tr-ms", 0, "fl-js", 2)
